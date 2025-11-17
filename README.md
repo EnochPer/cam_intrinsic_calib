@@ -1,0 +1,766 @@
+# 相机内参标定工具包
+
+> 使用棋盘格标定板自动计算相机内参矩阵和畸变系数的完整解决方案
+> 
+> **优化相机**: Sony IMX264 (2448×2048, 6mm 镜头)
+
+## 📋 目录
+
+- [功能概览](#功能概览)
+- [快速开始](#快速开始)
+- [详细使用](#详细使用)
+- [标定结果](#标定结果)
+- [应用示例](#应用示例)
+- [常见问题](#常见问题)
+- [技术细节](#技术细节)
+
+---
+
+## 📦 功能概览
+
+### 核心模块
+
+| 模块 | 功能 | 语言 | 说明 |
+|------|------|------|------|
+| `camera_node` | 图像采集 | C++ | ROS2 节点，支持海康威视相机 |
+| `calibrate_camera` | 标定计算 | C++ | 自动检测棋盘格，计算内参 |
+| `analyze_calibration.py` | 结果分析 | Python | 验证标定质量，多格式导出 |
+| `calibrate.sh` | 快速启动 | Bash | 一键完整标定流程 |
+
+### 工作流程
+
+```
+采集 20-50 张棋盘格图像 (camera_node)
+              ↓
+自动检测棋盘格角点 (calibrate_camera)
+              ↓
+计算相机内参矩阵 K (3×3)
+              ↓
+估计畸变系数 (5 参数)
+              ↓
+自动验证标定质量 (analyze_calibration.py)
+              ↓
+输出 YAML/TXT 标定结果文件
+```
+
+---
+
+## 🚀 快速开始 (15 分钟)
+
+### 前置条件
+
+```bash
+# 必需
+- Ubuntu 22.04 LTS
+- ROS2 Humble (或基于 Ubuntu 22.04 的其他版本)
+- OpenCV 4.5+
+- CMake 3.10+
+- C++17 编译器
+- Python 3.8+
+
+# 可选
+- 海康威视 MVS SDK (仅用于 camera_node)
+```
+
+### 第 1 步：编译项目 (2 分钟)
+
+```bash
+cd ~/hikon_cam
+colcon build --packages-select cam_intrinsic_calib
+source install/setup.bash
+```
+
+### 第 2 步：采集标定图像 (5-10 分钟)
+
+使用 ROS2 节点采集 20-50 张标定板图像。标定板为 **12×9 黑白棋盘格**。
+
+```bash
+# 基本用法
+ros2 run cam_intrinsic_calib camera_node --ros-args \
+  -p image_save_path:=/home/zzh/Pictures/hik
+
+# 调整采集帧率（默认 1 fps）
+ros2 run cam_intrinsic_calib camera_node --ros-args \
+  -p image_save_path:=/home/zzh/Pictures/hik \
+  -p capture_fps:=2
+```
+
+**采集要点：**
+- ✓ 采集 20-50 张图像（推荐 30-40 张）
+- ✓ 棋盘格应在不同位置（中心、四角、边缘）
+- ✓ 棋盘格应在不同角度（俯仰、偏航、横滚）
+- ✓ 确保光照充足，图像清晰
+- ✓ 整个 12×9 棋盘格完全可见
+
+### 第 3 步：运行标定 (1-2 分钟)
+
+```bash
+# 方法 A：使用快速脚本（推荐）
+cd ~/hikon_cam/src/cam_intrinsic_calib
+chmod +x calibrate.sh
+./calibrate.sh ~/Pictures/hik
+
+# 方法 B：直接运行
+./install/cam_intrinsic_calib/lib/cam_intrinsic_calib/calibrate_camera \
+  ~/Pictures/hik --output camera_calib.yaml --square-size 20
+```
+
+### 第 4 步：验证结果 (1 分钟)
+
+```bash
+python3 analyze_calibration.py camera_calibration.yaml
+```
+
+**预期输出：**
+```
+╔════════════════════════════════════════╗
+║       标定结果验证                      ║
+╚════════════════════════════════════════╝
+
+✓ 图像数量充足 (28/30)
+✓ 重投影误差良好 (0.42 px)
+✓ 焦距合理 (fx=1234, fy=1234)
+✓ 光心位置正确 (cx=640, cy=480)
+✓ 畸变系数正常
+
+📊 精度评级: ⭐⭐⭐⭐⭐ 优秀
+✅ 标定结果良好，可以使用
+```
+
+---
+
+## 📚 详细使用
+
+### 命令行参数
+
+#### `calibrate_camera`
+
+```bash
+用法: calibrate_camera <image_directory> [options]
+
+必需参数:
+  <image_directory>    标定图像所在目录
+
+可选参数:
+  --output <filename>     输出文件名 (默认: camera_calibration.yaml)
+  --square-size <mm>      棋盘格方块边长，单位mm (默认: 20)
+  --display               显示棋盘格检测结果（调试用）
+  --help                  显示帮助信息
+
+示例:
+  # 基本标定
+  ./calibrate_camera ~/Pictures/hik
+
+  # 自定义方块大小
+  ./calibrate_camera ~/Pictures/hik --square-size 25
+
+  # 显示检测过程并自定义输出文件
+  ./calibrate_camera ~/Pictures/hik --output my_calib.yaml --display
+```
+
+#### `analyze_calibration.py`
+
+```bash
+用法: python3 analyze_calibration.py <calibration_file> [options]
+
+必需参数:
+  <calibration_file>    标定结果 YAML 文件
+
+可选参数:
+  --numpy <output>      导出为 NumPy 格式 (.npy)
+  --text <output>       导出为文本格式 (.txt)
+  --check-only          仅进行有效性检查，不显示详细参数
+  --help                显示帮助信息
+
+示例:
+  # 基本分析
+  python3 analyze_calibration.py camera_calibration.yaml
+
+  # 多格式导出
+  python3 analyze_calibration.py camera_calib.yaml \
+    --numpy calib_data.npy --text calib_result.txt
+
+  # 仅检查有效性
+  python3 analyze_calibration.py camera_calib.yaml --check-only
+```
+
+### 标定图像要求
+
+#### 棋盘格规格
+- **尺寸**：12 列 × 9 行
+- **方块大小**：20-30mm（推荐 20mm）
+- **材质**：黑白印刷，高对比度
+
+#### 图像质量
+| 指标 | 要求 | 说明 |
+|------|------|------|
+| 格式 | BMP/JPG/PNG | 推荐 BMP（无损） |
+| 分辨率 | ≥640×480 | 推荐 1280×960+ |
+| 清晰度 | 棋盘格边界清晰 | 无运动模糊 |
+| 对比度 | 黑白对比度高 | 避免灰色区域 |
+| 曝光 | 既不过曝也不欠曝 | 细节清晰可见 |
+
+#### 采集多样性
+
+采集的图像应该包含：
+
+```
+位置覆盖:  中心  左上  右上  左下  右下  边缘
+角度覆盖:  正面  俯仰  偏航  横滚  组合
+
+目标: 20-50 张图像 (推荐 30-40 张)
+```
+
+### 输出文件
+
+标定程序生成两个输出文件：
+
+1. **camera_calibration.yaml** - OpenCV 兼容的 YAML 格式
+   ```yaml
+   image_width: 1280
+   image_height: 960
+   image_count: 30
+   
+   camera_matrix: !!opencv-matrix
+     rows: 3
+     cols: 3
+     data: [1234.56, 0, 640, 0, 1234.56, 480, 0, 0, 1]
+   
+   distortion_coefficients: !!opencv-matrix
+     rows: 5
+     cols: 1
+     data: [0.05, -0.1, 0, 0, 0]
+   
+   reprojection_error: 0.42
+   ```
+
+2. **camera_calibration.txt** - 易读的文本摘要
+   ```
+   相机标定结果
+   =================================
+   
+   图像信息:
+     分辨率: 1280 x 960
+     标定图像数: 30 张
+   
+   相机矩阵 (K):
+     fx = 1234.56 px
+     fy = 1234.56 px
+     cx = 640.00 px
+     cy = 480.00 px
+   
+   畸变系数 (5参数):
+     k1 = 0.0500
+     k2 = -0.1000
+     k3 = 0.0000
+     p1 = 0.0000
+     p2 = 0.0000
+   
+   精度指标:
+     重投影误差 (RMS): 0.42 px
+     精度评级: ⭐⭐⭐⭐⭐ 优秀
+   ```
+
+---
+
+## 📊 标定结果
+
+### 相机硬件规格
+
+本工具针对以下相机规格进行了优化：
+
+| 参数 | 值 |
+|------|-----|
+| 型号 | Sony IMX264 |
+| 分辨率 | 2448 × 2048 像素 |
+| 像元尺寸 | 3.45 × 3.45 μm |
+| 靶面尺寸 | 2/3" |
+| 传感器宽度 | 8.4456 mm |
+| 传感器高度 | 7.0656 mm |
+| 镜头焦距 | 6mm |
+| **理论焦距** | **1739.13 px** |
+
+**理论焦距计算公式**:
+$$f_{\text{px}} = \frac{F_{\text{mm}} \times \text{Image Width}_{\text{px}}}{\text{Sensor Width}_{\text{mm}}}$$
+
+**本相机的计算**:
+$$f = \frac{6 \text{ mm} \times 2448 \text{ px}}{8.4456 \text{ mm}} = 1739.13 \text{ px}$$
+
+其中：
+- $F_{\text{mm}}$ = 镜头标称焦距（6mm）
+- $\text{Image Width}_{\text{px}}$ = 图像宽度（2448 px）
+- $\text{Sensor Width}_{\text{mm}}$ = 传感器宽度（8.4456 mm）
+
+### 相机矩阵 (Camera Intrinsic Matrix)
+
+$$K = \begin{pmatrix}
+f_x & 0 & c_x \\
+0 & f_y & c_y \\
+0 & 0 & 1
+\end{pmatrix}$$
+
+| 符号 | 含义 | 单位 | 说明 |
+|------|------|------|------|
+| $f_x, f_y$ | 焦距 | 像素 | 相机在 x/y 方向的焦距 |
+| $c_x, c_y$ | 光心/主点 | 像素 | 图像中心点坐标 |
+
+**参考值：**
+- 网络摄像头：fx/fy ≈ 500-1500 px
+- 手机摄像头：fx/fy ≈ 1000-3000 px
+- 工业相机：取决于镜头，可以更大
+
+### 畸变系数 (5 参数模型)
+
+| 参数 | 含义 | 影响 |
+|------|------|------|
+| $k_1, k_2, k_3$ | 径向畸变 | 桶形/枕形失真 |
+| $p_1, p_2$ | 切向畸变 | 由镜头不完全平行引起 |
+
+典型值：
+```
+k1: -0.1 ~ 0.3     (常见负值)
+k2: -0.1 ~ 0.1
+k3: -0.01 ~ 0.01   (通常很小)
+p1, p2: -0.01 ~ 0.01
+```
+
+### 精度评估 (重投影误差 RMS)
+
+| RMS 误差 | 精度评级 | 适用场景 |
+|---------|---------|---------|
+| < 0.5 px | ⭐⭐⭐⭐⭐ 优秀 | 精密测量、3D 重建 |
+| 0.5-1.0 px | ⭐⭐⭐⭐ 良好 | 普通视觉应用 |
+| 1.0-2.0 px | ⭐⭐⭐ 可接受 | 要求不高的应用 |
+| > 2.0 px | ⭐⭐ 需改进 | 需要重新采集或调整 |
+
+---
+
+## 💻 应用示例
+
+### C++ 中使用标定结果
+
+```cpp
+#include <opencv2/opencv.hpp>
+
+// 加载标定结果
+cv::FileStorage fs("camera_calibration.yaml", cv::FileStorage::READ);
+cv::Mat K = fs["camera_matrix"].mat();
+cv::Mat dist = fs["distortion_coefficients"].mat();
+fs.release();
+
+// 方法1: 直接矫正
+cv::Mat image = cv::imread("test.jpg");
+cv::Mat undistorted;
+cv::undistort(image, undistorted, K, dist);
+
+// 方法2: 获得优化的相机矩阵（裁剪黑边）
+cv::Mat new_K;
+cv::Rect roi;
+new_K = cv::getOptimalNewCameraMatrix(K, dist, image.size(), 1, image.size(), &roi);
+cv::Mat map1, map2;
+cv::initUndistortRectifyMap(K, dist, cv::Mat(), new_K, image.size(), CV_32F, map1, map2);
+cv::Mat result;
+cv::remap(image, result, map1, map2, cv::INTER_LINEAR);
+
+// 显示结果
+cv::imshow("Original", image);
+cv::imshow("Undistorted", undistorted);
+cv::waitKey(0);
+```
+
+### Python 中使用标定结果
+
+```python
+import cv2
+import numpy as np
+
+# 加载标定结果
+fs = cv2.FileStorage("camera_calibration.yaml", cv2.FILE_STORAGE_READ)
+K = fs.getNode("camera_matrix").mat()
+dist = fs.getNode("distortion_coefficients").mat()
+fs.release()
+
+# 方法1: 直接矫正
+image = cv2.imread("test.jpg")
+undistorted = cv2.undistort(image, K, dist)
+
+# 方法2: 获得优化的相机矩阵
+h, w = image.shape[:2]
+new_K, roi = cv2.getOptimalNewCameraMatrix(K, dist, (w, h), 1, (w, h))
+map1, map2 = cv2.initUndistortRectifyMap(K, dist, None, new_K, (w, h), cv2.CV_32F)
+result = cv2.remap(image, map1, map2, cv2.INTER_LINEAR)
+
+# 进行 3D 重建或立体视觉（后续操作）
+# 从像素坐标转换到相机坐标系
+def pixel_to_camera(uv, depth, K):
+    """像素坐标 + 深度 -> 相机坐标"""
+    fx = K[0, 0]
+    fy = K[1, 1]
+    cx = K[0, 2]
+    cy = K[1, 2]
+    x = (uv[0] - cx) * depth / fx
+    y = (uv[1] - cy) * depth / fy
+    return np.array([x, y, depth])
+```
+
+### ROS2 中加载和使用
+
+```cpp
+// 在 ROS2 节点中使用标定结果
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/image.hpp>
+#include <opencv2/opencv.hpp>
+#include <cv_bridge/cv_bridge.h>
+
+class CameraCalibrationNode : public rclcpp::Node {
+public:
+    CameraCalibrationNode() : Node("camera_calibration") {
+        // 加载标定参数
+        cv::FileStorage fs("camera_calibration.yaml", cv::FileStorage::READ);
+        K_ = fs["camera_matrix"].mat();
+        dist_ = fs["distortion_coefficients"].mat();
+        fs.release();
+        
+        // 订阅原始图像
+        sub_ = create_subscription<sensor_msgs::msg::Image>(
+            "/camera/image_raw", 10,
+            std::bind(&CameraCalibrationNode::imageCallback, this, std::placeholders::_1));
+        
+        // 发布矫正后的图像
+        pub_ = create_publisher<sensor_msgs::msg::Image>("/camera/image_undistorted", 10);
+    }
+    
+private:
+    void imageCallback(const sensor_msgs::msg::Image::SharedPtr msg) {
+        // 转换为 OpenCV 格式
+        cv::Mat image = cv_bridge::toCvShare(msg)->image.clone();
+        
+        // 矫正失真
+        cv::Mat undistorted;
+        cv::undistort(image, undistorted, K_, dist_);
+        
+        // 发布结果
+        auto out_msg = cv_bridge::CvImage(msg->header, "bgr8", undistorted).toImageMsg();
+        pub_->publish(*out_msg);
+    }
+    
+    cv::Mat K_, dist_;
+    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_;
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_;
+};
+```
+
+---
+
+## ⚠️ 常见问题
+
+### Q1: 无法检测到棋盘格
+
+**可能原因和解决方案：**
+
+1. **棋盘格规格不对**
+   - 确认棋盘格为 12×9（列×行）
+   - 如果是其他规格，修改 `calibrate_camera.cpp` 中的常量：
+     ```cpp
+     const int CHESSBOARD_COLS = 12;  // 修改这里
+     const int CHESSBOARD_ROWS = 9;   // 修改这里
+     ```
+   - 重新编译：`colcon build --packages-select cam_intrinsic_calib`
+
+2. **图像质量问题**
+   ```bash
+   # 使用 --display 查看检测过程
+   ./calibrate_camera ~/Pictures/hik --display
+   ```
+   - 检查黑白对比度
+   - 确保光照充足
+   - 避免反光和阴影
+
+3. **棋盘格不完整**
+   - 重新采集，确保整个棋盘格都在图像中
+   - 避免棋盘格被切割
+
+4. **图像格式问题**
+   - 确认图像为 BMP/JPG/PNG 格式
+   - 避免使用损坏的文件
+
+**调试步骤：**
+```bash
+# 1. 检查图像目录
+ls ~/Pictures/hik/ | head -5
+
+# 2. 运行标定并显示结果
+./calibrate_camera ~/Pictures/hik --display
+
+# 3. 查看程序输出中的检测成功率
+# 如果成功率 < 50%，需要改进图像采集条件
+```
+
+### Q2: 重投影误差很大（RMS > 2.0 px）
+
+**可能原因和解决方案：**
+
+1. **标定图像数量或质量不足**
+   - 增加采集图像数量至 40-50 张
+   - 确保图像多样性（不同位置和角度）
+
+2. **方块大小设置错误**
+   ```bash
+   # 确认实际棋盘格方块大小，然后使用 --square-size
+   ./calibrate_camera ~/Pictures/hik --square-size 25
+   ```
+   - 默认值为 20mm
+   - 如果棋盘格打印时缩放了，需要调整此参数
+
+3. **棋盘格打印不精确**
+   - 检查打印的棋盘格是否变形（特别是在纸张边缘）
+   - 使用高质量的印刷棋盘格
+   - 避免使用手工绘制的棋盘格
+
+4. **相机参数不稳定**
+   - 重新采集所有标定图像
+   - 确保采集过程中相机参数（焦距、光圈）不变
+
+**改进步骤：**
+```bash
+# 1. 重新采集更多高质量图像
+ros2 run cam_intrinsic_calib camera_node --ros-args \
+  -p image_save_path:=/home/zzh/Pictures/hik_v2
+
+# 2. 验证方块大小
+# 使用尺子测量实际棋盘格方块大小
+
+# 3. 使用正确的参数运行标定
+./calibrate_camera ~/Pictures/hik_v2 --square-size 20
+
+# 4. 检查结果
+python3 analyze_calibration.py camera_calibration.yaml
+```
+
+### Q3: 焦距值看起来不对
+
+**焦距的理解：**
+
+焦距（像素值）= 实际焦距（mm） × 分辨率（像素/mm） / 传感器尺寸
+
+**本相机的焦距预期范围：**
+
+对于**本项目相机（Sony IMX264，2448×2048，6mm 镜头）**：
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 型号 | Sony IMX264 | 实际相机型号 |
+| 镜头焦距 | 6 mm | 标称焦距 |
+| 分辨率 | 2448 × 2048 px | 实际采集分辨率 |
+| 像元尺寸 | 3.45 × 3.45 μm | 像元规格 |
+| 传感器宽度 | 8.4456 mm | 2448 × 3.45 / 1000 |
+| **理论焦距** | **1739.13 px** | 6 × 2448 / 8.4456 |
+| **期望范围 (±5%)** | **1652.2 - 1826.1 px** | 标定结果应落在此范围 |
+| **广泛范围 (0.8-1.5×)** | **1958.4 - 3672.0 px** | 异常检测的边界 |
+
+**验证方法（针对本相机）：**
+
+```python
+# 用 Sony IMX264 实际参数验证标定结果
+import math
+
+# 标定得到的焦距
+fx = 1739.13  # 示例值（理想情况）
+
+# 已知参数
+sensor_width_mm = 8.4456  # Sony IMX264 传感器宽度（毫米）
+image_width_px = 2448     # 图像宽度（像素）
+lens_focal_length = 6     # 镜头标称焦距（毫米）
+
+# 计算等效焦距
+pixel_size = sensor_width_mm / image_width_px  # mm/px
+equivalent_focal_length = fx * pixel_size  # mm
+
+print(f"标定焦距(等效): {equivalent_focal_length:.2f}mm")
+print(f"镜头标称焦距: {lens_focal_length}mm")
+print(f"差异: {abs(equivalent_focal_length - lens_focal_length):.2f}mm")
+
+# 评判标准：
+# 差异 < 0.3mm: 优秀 ⭐⭐⭐⭐⭐
+# 差异 < 0.8mm: 良好 ⭐⭐⭐⭐
+# 差异 < 1.5mm: 可接受 ⭐⭐⭐
+# 差异 > 1.5mm: 需要检查 ⚠️
+```
+
+**标定结果自动校验**：
+
+程序运行时会自动进行如下校验：
+
+1. **严格范围检查** (±5%)
+   - ✓ 焦距应在 1652.2 - 1826.1 px 范围内
+   - 这是理想情况下的最可能范围
+
+2. **广泛范围检查** (0.8-1.5×分辨率)
+   - ✓ 焦距应在 1958.4 - 3672.0 px 范围内
+   - 这是数据仍然可用的范围
+
+3. **等效焦距验证**
+   - ✓ 等效焦距与镜头标称焦距的差异应 < 1.5mm
+   - 差异 < 0.3mm 为优秀，< 0.8mm 为良好
+
+4. **光心位置检查**
+   - ✓ 光心应在图像 10%-90% 范围内
+
+5. **畸变系数检查**
+   - ✓ 畸变系数应在正常范围内
+
+如果校验失败，程序会显示具体的警告信息和改进建议。详见 **CAMERA_CONFIG.md** 了解完整的校验标准。
+
+---
+
+## 🔧 技术细节
+
+### 标定算法
+
+本项目使用的是经典的 **Zhang's method**（张正友标定法），通过 OpenCV 的 `cv::calibrateCamera()` 实现。
+
+**关键步骤：**
+
+1. **棋盘格检测**
+   ```cpp
+   // 自适应阈值 + 边缘检测
+   cv::findChessboardCorners(
+       image, Size(12, 9), corners,
+       CALIB_CB_ADAPTIVE_THRESH | CALIB_CB_NORMALIZE_IMAGE);
+   
+   // 亚像素精化（重要！提高精度）
+   cv::cornerSubPix(
+       gray, corners, Size(11, 11), Size(-1, -1),
+       TermCriteria(COUNT | EPS, 30, 0.001));
+   ```
+
+2. **内参计算**
+   ```cpp
+   double rms = cv::calibrateCamera(
+       objectPoints, imagePoints, imageSize,
+       K, dist, rvecs, tvecs,
+       CALIB_FIX_PRINCIPAL_POINT);
+   ```
+
+3. **精度评估**
+   - 重投影误差：计算标定板对应的 3D 点投影到图像后的误差
+   - 误差越小，标定越精确
+
+### 代码结构
+
+```
+calibrate_camera.cpp
+├── main()
+│   └── CalibrationAnalyzer analyzer
+│       ├── readImagePaths()          读取图像列表
+│       ├── detectChessboardCorners() 棋盘格检测
+│       ├── extractCornerPoints()     角点提取
+│       ├── calibrateCamera()         内参计算
+│       ├── printCalibrationResult()  打印结果
+│       └── saveCalibrationToYAML()   保存结果
+│
+└── struct CalibrationResult
+    ├── K (camera_matrix)
+    ├── dist (distortion_coefficients)
+    ├── rvecs (rotation_vectors)
+    ├── tvecs (translation_vectors)
+    └── rms_error
+```
+
+### 性能指标
+
+| 指标 | 值 |
+|------|-----|
+| 支持图像格式 | BMP, JPG, PNG |
+| 棋盘格规格 | 12×9（可配置） |
+| 推荐图像数 | 20-50 张 |
+| 标定时间 | < 5 秒 |
+| 重投影误差 | < 0.5 px（优秀） |
+| 内存占用 | < 100 MB |
+
+---
+
+## 📁 项目文件结构
+
+```
+cam_intrinsic_calib/
+├── src/
+│   ├── camera_node.cpp              # 图像采集 ROS2 节点
+│   ├── calibrate_camera.cpp         # 标定计算程序
+│   └── SimpleCapture.cpp            # 参考程序
+│
+├── include/cam_intrinsic_calib/
+│   ├── MvCameraControl.h            # 海康 SDK 头文件
+│   ├── CameraParams.h
+│   ├── PixelType.h
+│   └── ...（其他 SDK 头文件）
+│
+├── 📖 文档
+│   └── README.md                    # 本文件（完整文档）
+│
+├── 🛠️ 工具
+│   ├── calibrate.sh                 # 快速启动脚本
+│   ├── analyze_calibration.py       # 结果分析工具
+│   └── QuickReference.md            # SDK 快速参考
+│
+└── 📋 配置
+    ├── CMakeLists.txt               # 编译配置
+    └── package.xml                  # ROS2 包配置
+```
+
+---
+
+## 🔗 依赖项
+
+### 必需
+- **OpenCV 4.5+** - 图像处理和标定算法
+- **CMake 3.10+** - 构建系统
+- **C++17 编译器** - GCC 7+ 或 Clang 5+
+
+### 可选
+- **ROS2 Humble** - 仅用于 `camera_node`
+- **海康威视 MVS SDK** - 仅用于 `camera_node`
+- **Python 3.8+** - 仅用于 `analyze_calibration.py`
+
+### 安装依赖（Ubuntu 22.04）
+
+```bash
+# 基础依赖
+sudo apt install -y \
+    build-essential \
+    cmake \
+    git \
+    libopencv-dev \
+    python3-pip
+
+# ROS2（可选）
+curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | sudo apt-key add -
+sudo apt install -y software-properties-common
+sudo add-apt-repository "deb [arch=$(dpkg --print-architecture)] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main"
+sudo apt install -y ros-humble-ros-core ros-humble-ament-cmake
+
+# Python 依赖
+pip3 install opencv-python numpy
+```
+
+---
+
+## 📞 获取帮助
+
+**遇到问题？按顺序查看：**
+
+1. 本文档的 [常见问题](#常见问题) 部分
+2. 代码中的详细注释（`calibrate_camera.cpp`）
+3. OpenCV 官方文档：https://docs.opencv.org/
+
+---
+
+## 📈 版本历史
+
+| 版本 | 日期 | 说明 |
+|------|------|------|
+| 1.0 | 2025-11-13 | 初始发布 |
+
+---
+
+**最后更新**: 2025 年 11 月 14 日
