@@ -23,24 +23,62 @@
 | 模块 | 功能 | 语言 | 说明 |
 |------|------|------|------|
 | `camera_node` | 图像采集 | C++ | ROS2 节点，支持海康威视相机 |
-| `calibrate_camera` | 标定计算 | C++ | 自动检测棋盘格，计算内参 |
+| `calibrate_camera` | 内参标定 | C++ | 自动检测棋盘格，计算内参 |
+| `undistort_camera` | 图像去畸变 | C++ | 读取标定结果，对图像去除畸变 |
+| `extrinsic_calib` | 外参标定 | C++ | 已知控制点坐标，计算相机姿态 |
 | `analyze_calibration.py` | 结果分析 | Python | 验证标定质量，多格式导出 |
 | `calibrate.sh` | 快速启动 | Bash | 一键完整标定流程 |
 
 ### 工作流程
 
 ```
-采集 20-50 张棋盘格图像 (camera_node)
+┌─────────────────────────────────────────────────────────────┐
+│                   相机标定完整流程图                        │
+└─────────────────────────────────────────────────────────────┘
+
+【第一阶段】内参标定
+  采集 20-50 张棋盘格图像 (camera_node)
               ↓
-自动检测棋盘格角点 (calibrate_camera)
+  自动检测棋盘格角点 (calibrate_camera)
               ↓
-计算相机内参矩阵 K (3×3)
+  计算相机内参矩阵 K (3×3)
               ↓
-估计畸变系数 (5 参数)
+  估计畸变系数 (5 参数)
               ↓
-自动验证标定质量 (analyze_calibration.py)
+  自动验证标定质量 (analyze_calibration.py)
               ↓
-输出 YAML/TXT 标定结果文件
+  输出内参 YAML 文件 (camera_calibration.yaml)
+
+
+【第二阶段】图像处理（可选）
+  ┌──────────────────────────────┐
+  │ 使用内参去除图像畸变         │
+  │ undistort_camera             │
+  │ - 读取内参文件               │
+  │ - 批量处理图像               │
+  │ - 输出去畸变结果             │
+  └──────────────────────────────┘
+
+
+【第三阶段】外参标定（可选）
+  准备已知坐标的世界控制点 (20 个 1×1 棋盘格点)
+              ↓
+  标记或提供这些点在图像中的像素坐标
+              ↓
+  运行外参标定程序 (extrinsic_calib)
+              ↓
+  计算相机旋转矩阵 R (3×3)
+              ↓
+  计算相机平移向量 t (3×1)
+              ↓
+  输出外参 YAML 文件 (extrinsic.yaml)
+              ↓
+  获得完整的相机姿态信息
+
+【最终结果】
+  内参: camera_calibration.yaml
+  外参: extrinsic.yaml (可选)
+  去畸变图像: output_directory (可选)
 ```
 
 ---
@@ -188,6 +226,115 @@ python3 analyze_calibration.py camera_calibration.yaml
   # 仅检查有效性
   python3 analyze_calibration.py camera_calib.yaml --check-only
 ```
+
+#### `undistort_camera` - 图像去畸变
+
+```bash
+用法: undistort_camera <intrinsic_yaml> <input_image_dir> [options]
+
+必需参数:
+  <intrinsic_yaml>      相机内参文件（YAML格式，来自 calibrate_camera）
+  <input_image_dir>     输入图像目录
+
+可选参数:
+  --output <dir>        输出目录 (默认: ./undistorted)
+  --alpha <value>       缩放因子 (0.0-1.0, 默认: 0.0)
+                        - 0.0: 移除所有黑色边界
+                        - 1.0: 保留所有原始像素
+  --format <ext>        输出图像格式 (默认: png)
+                        可选: png, jpg, bmp
+  --help                显示帮助信息
+
+示例:
+  # 基本用法
+  undistort_camera camera_calibration.yaml ./raw_images
+
+  # 自定义输出目录和格式
+  undistort_camera camera_calibration.yaml ./raw_images \
+    --output ./corrected --format jpg
+
+  # 保留所有原始像素（不裁剪黑边）
+  undistort_camera camera_calibration.yaml ./raw_images \
+    --output ./corrected --alpha 1.0
+```
+
+**功能说明：**
+- ✓ 批量处理输入目录中的所有图像（支持 BMP/JPG/PNG）
+- ✓ 应用相机内参中的畸变系数进行校正
+- ✓ 支持自定义输出目录和格式
+- ✓ 显示处理进度和统计信息
+- ✓ 自动创建输出目录
+
+#### `extrinsic_calib` - 外参标定
+
+```bash
+用法: extrinsic_calib <image_file> <intrinsic_yaml> [options]
+
+必需参数:
+  <image_file>          输入图像（包含棋盘格和控制点）
+  <intrinsic_yaml>      相机内参文件（来自 calibrate_camera）
+
+可选参数:
+  --world-points <file> 世界坐标系控制点文件
+                        格式：每行一个点，3个值用空格分隔 (x y z)
+                        默认：自动生成 4×5 的 1×1 棋盘格点
+  --image-points <file> 图像坐标系控制点文件
+                        格式：每行一个点，2个值用空格分隔 (x y)
+                        如果不提供，会要求用户在图像上交互式点击
+  --output <file>       输出外参文件名 (默认: extrinsic.yaml)
+  --show-board          显示棋盘格点标记结果
+  --help                显示帮助信息
+
+示例:
+  # 使用默认棋盘格，交互式标记
+  extrinsic_calib photo.jpg camera_calibration.yaml
+
+  # 使用已有的控制点文件
+  extrinsic_calib photo.jpg camera_calibration.yaml \
+    --world-points points_3d.txt \
+    --image-points points_2d.txt
+
+  # 自定义输出文件
+  extrinsic_calib photo.jpg camera_calibration.yaml \
+    --world-points points_3d.txt \
+    --image-points points_2d.txt \
+    --output my_extrinsic.yaml
+```
+
+**功能说明：**
+- ✓ 使用 PnP 算法求解相机姿态
+- ✓ 支持已知世界坐标系控制点（20 个 1×1 棋盘格点）
+- ✓ 交互式标记模式（左键点击标记，右键撤销）
+- ✓ 自动计算重投影误差
+- ✓ 输出完整的旋转矩阵、旋转向量、平移向量
+- ✓ 验证外参合理性（正交性、行列式、重投影误差）
+
+**控制点文件格式：**
+
+`world_points.txt` (世界坐标，单位 mm)：
+```
+0 0 0
+1 0 0
+2 0 0
+3 0 0
+4 0 0
+0 1 0
+1 1 0
+...
+```
+
+`image_points.txt` (图像坐标，单位像素)：
+```
+100.5 200.3
+150.2 200.1
+200.1 200.4
+250.0 200.0
+300.5 200.2
+100.0 250.5
+...
+```
+
+---
 
 ### 标定图像要求
 
@@ -342,6 +489,61 @@ p1, p2: -0.01 ~ 0.01
 
 ## 💻 应用示例
 
+### 完整工作流程示例
+
+#### 场景：标定 Sony IMX264 相机，进行去畸变，并求解相机姿态
+
+```bash
+# 第 1 步：采集标定图像（30 张）
+mkdir -p ~/hik_images
+ros2 run cam_intrinsic_calib camera_node --ros-args \
+  -p image_save_path:=$HOME/hik_images
+
+# 第 2 步：运行内参标定
+cd ~/hikon_cam/install/cam_intrinsic_calib/lib/cam_intrinsic_calib
+./calibrate_camera ~/hik_images --output camera_calib.yaml --square-size 20
+
+# 第 3 步：验证标定结果
+python3 analyze_calibration.py camera_calib.yaml
+
+# 第 4 步：对包含失真的图像进行去畸变（可选）
+./undistort_camera camera_calib.yaml ~/hik_images --output ~/hik_undistorted
+
+# 第 5 步：准备外参标定（可选）
+# 创建控制点文件
+cat > world_points.txt << 'EOF'
+0 0 0
+1 0 0
+2 0 0
+3 0 0
+4 0 0
+0 1 0
+1 1 0
+2 1 0
+3 1 0
+4 1 0
+0 2 0
+1 2 0
+2 2 0
+3 2 0
+4 2 0
+0 3 0
+1 3 0
+2 3 0
+3 3 0
+4 3 0
+EOF
+
+# 第 6 步：进行外参标定（使用一张包含棋盘格的照片）
+./extrinsic_calib ~/hik_images/image_001.bmp camera_calib.yaml \
+  --world-points world_points.txt --output extrinsic.yaml
+
+# 最终输出：
+# - camera_calib.yaml      (内参)
+# - extrinsic.yaml         (外参，可选)
+# - ~/hik_undistorted/      (去畸变图像目录，可选)
+```
+
 ### C++ 中使用标定结果
 
 ```cpp
@@ -406,6 +608,64 @@ def pixel_to_camera(uv, depth, K):
     x = (uv[0] - cx) * depth / fx
     y = (uv[1] - cy) * depth / fy
     return np.array([x, y, depth])
+
+# ============ 外参使用示例 ============
+# 加载外参结果（如果有的话）
+fs = cv2.FileStorage("extrinsic.yaml", cv2.FILE_STORAGE_READ)
+R = fs.getNode("rotation_matrix").mat()        # 旋转矩阵 (3×3)
+t = fs.getNode("translation_vector").mat()    # 平移向量 (3×1)
+rvec = fs.getNode("rotation_vector").mat()    # 旋转向量 (3×1)
+fs.release()
+
+# 已知世界坐标系下的 3D 点
+world_point = np.array([[10.0], [20.0], [30.0]])  # mm
+
+# 将世界坐标转换到相机坐标系
+camera_point = R @ world_point + t
+print(f"世界坐标: {world_point.T}")
+print(f"相机坐标: {camera_point.T}")
+
+# 将相机坐标投影到图像上
+image_point = K @ camera_point / camera_point[2]
+print(f"图像坐标: ({image_point[0, 0]}, {image_point[1, 0]})")
+
+# 计算欧拉角（参考）
+def rotation_matrix_to_euler(R):
+    """旋转矩阵 -> 欧拉角 (roll, pitch, yaw)"""
+    sy = np.sqrt(R[0, 0]**2 + R[1, 0]**2)
+    singular = sy < 1e-6
+    
+    if not singular:
+        x = np.arctan2(R[2, 1], R[2, 2])
+        y = np.arctan2(-R[2, 0], sy)
+        z = np.arctan2(R[1, 0], R[0, 0])
+    else:
+        x = np.arctan2(-R[1, 2], R[1, 1])
+        y = np.arctan2(-R[2, 0], sy)
+        z = 0
+    
+    return np.array([x, y, z]) * 180 / np.pi  # 转换为度数
+
+euler = rotation_matrix_to_euler(R)
+print(f"欧拉角 (degrees): Roll={euler[0]:.2f}, Pitch={euler[1]:.2f}, Yaw={euler[2]:.2f}")
+```
+
+### 外参标定的使用场景
+
+**外参标定用于：**
+1. **坐标转换**：将世界坐标系的点转换到相机坐标系或图像坐标系
+2. **相机定位**：确定相机在世界坐标系中的位置和姿态
+3. **3D 重建**：多个相机的外参用于立体视觉或多视图重建
+4. **视觉测量**：精确测量物体在世界坐标系中的位置
+5. **机器人控制**：用于机器人视觉伺服和抓取控制
+
+**坐标变换关系：**
+```
+世界坐标 (x_w, y_w, z_w)
+         ↓ (外参: R, t)
+相机坐标 (x_c, y_c, z_c) = R*X_w + t
+         ↓ (内参: K)
+图像坐标 (u, v) = K*(x_c/z_c, y_c/z_c)
 ```
 
 ### ROS2 中加载和使用

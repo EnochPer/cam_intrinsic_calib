@@ -51,8 +51,16 @@ target_link_libraries(undistort_camera
   ${OpenCV_LIBS}
 )
 
+# 可执行文件4: extrinsic_calib (外参标定工具)
+add_executable(extrinsic_calib src/extrinsic_calib.cpp)
+
+# 为 extrinsic_calib 链接 OpenCV
+target_link_libraries(extrinsic_calib
+  ${OpenCV_LIBS}
+)
+
 # 安装可执行文件
-install(TARGETS camera_node calibrate_camera undistort_camera
+install(TARGETS camera_node calibrate_camera undistort_camera extrinsic_calib
   RUNTIME DESTINATION lib/${PROJECT_NAME}  # 可执行文件安装到 lib/${PROJECT_NAME} 目录
 )
 
