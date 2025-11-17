@@ -43,8 +43,16 @@ target_link_libraries(calibrate_camera
   ${OpenCV_LIBS}
 )
 
+# 可执行文件3: undistort_camera (图像去畸变工具)
+add_executable(undistort_camera src/undistort_camera.cpp)
+
+# 为 undistort_camera 链接 OpenCV
+target_link_libraries(undistort_camera
+  ${OpenCV_LIBS}
+)
+
 # 安装可执行文件
-install(TARGETS camera_node calibrate_camera
+install(TARGETS camera_node calibrate_camera undistort_camera
   RUNTIME DESTINATION lib/${PROJECT_NAME}  # 可执行文件安装到 lib/${PROJECT_NAME} 目录
 )
 

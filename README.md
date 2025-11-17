@@ -65,7 +65,12 @@
 ### 第 1 步：编译项目 (2 分钟)
 
 ```bash
+#建立工作空间
+mkidr ~/hikon_cam
 cd ~/hikon_cam
+mkdir src/
+git clone https://github.com/EnochPer/cam_intrinsic_calib.git
+cd ../..
 colcon build --packages-select cam_intrinsic_calib
 source install/setup.bash
 ```
@@ -102,7 +107,7 @@ chmod +x calibrate.sh
 
 # 方法 B：直接运行
 ./install/cam_intrinsic_calib/lib/cam_intrinsic_calib/calibrate_camera \
-  ~/Pictures/hik --output camera_calib.yaml --square-size 20
+  ~/Pictures/hik --output camera_calib.yaml --square-size 45
 ```
 
 ### 第 4 步：验证结果 (1 分钟)
