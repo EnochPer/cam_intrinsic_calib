@@ -18,7 +18,7 @@ class CameraNode : public rclcpp::Node {
     // 声明参数
     this->declare_parameter<std::string>("image_save_path",
                                          "/home/zzh/Pictures/hik");
-    this->declare_parameter<int>("capture_fps", 1);
+    this->declare_parameter<int>("capture_fps", 3);
 
     // 获取参数值
     image_save_path_ = this->get_parameter("image_save_path").as_string();
@@ -91,7 +91,7 @@ class CameraNode : public rclcpp::Node {
     }
 
     // ========================================================================
-    // 设置增益：增加10dB
+    // 设置增益
     // ========================================================================
     MVCC_FLOATVALUE stGainValue = {0};
     nRet = MV_CC_GetFloatValue(handle_, "Gain", &stGainValue);
@@ -100,8 +100,8 @@ class CameraNode : public rclcpp::Node {
                   "Current Gain: %.2f dB, Range: [%.2f, %.2f] dB",
                   stGainValue.fCurValue, stGainValue.fMin, stGainValue.fMax);
 
-      // 计算目标增益：当前增益 + 10dB
-      float targetGain = stGainValue.fCurValue + 10.0f;
+      // 计算目标增益：当前增益 + 增量
+      float targetGain = stGainValue.fCurValue - 5.0;
 
       // 确保目标增益在有效范围内
       if (targetGain > stGainValue.fMax) {
@@ -109,7 +109,7 @@ class CameraNode : public rclcpp::Node {
         RCLCPP_WARN(
             this->get_logger(),
             "Target gain (%.2f dB) exceeds maximum. Clamping to %.2f dB",
-            stGainValue.fCurValue + 10.0f, targetGain);
+            stGainValue.fCurValue, targetGain);
       }
 
       nRet = MV_CC_SetFloatValue(handle_, "Gain", targetGain);
@@ -126,18 +126,96 @@ class CameraNode : public rclcpp::Node {
     }
 
     // ========================================================================
-    // 设置帧率为最大值，然后设置曝光时间
+    // 设置曝光和帧率参数（需要注意参数依赖顺序）
     // ========================================================================
+
+    // Step 1: 禁用自动曝光（重要！某些相机需要先禁用自动模式）
+    nRet = MV_CC_SetEnumValue(handle_, "ExposureAuto", 1);
+    if (nRet == MV_OK) {
+      RCLCPP_INFO(this->get_logger(), "Auto Exposure disabled");
+    } else {
+      RCLCPP_WARN(
+          this->get_logger(),
+          "Failed to disable auto exposure: 0x%x (may not be available)", nRet);
+    }
+
+    // Step 2: 设置曝光模式为手动（如果支持）
+    // nRet = MV_CC_SetEnumValue(handle_, "ExposureMode", 0);  // 0 = Manual
+    // if (nRet == MV_OK) {
+    //   RCLCPP_INFO(this->get_logger(), "Exposure mode set to Manual");
+    // } else {
+    //   RCLCPP_WARN(this->get_logger(),
+    //               "Failed to set exposure mode: 0x%x (may not be available)",
+    //               nRet);
+    // }
+
+    // Step 3: 查询曝光时间范围
+    MVCC_FLOATVALUE stExposureTime = {0};
+    nRet = MV_CC_GetFloatValue(handle_, "ExposureTime", &stExposureTime);
+    if (nRet == MV_OK) {
+      RCLCPP_INFO(this->get_logger(),
+                  "Current ExposureTime: %.2f μs, Range: [%.2f, %.2f] μs",
+                  stExposureTime.fCurValue, stExposureTime.fMin,
+                  stExposureTime.fMax);
+    } else {
+      RCLCPP_WARN(this->get_logger(),
+                  "Failed to query exposure time parameter: 0x%x", nRet);
+    }
+
+    // Step 4: 查询帧率范围
     MVCC_FLOATVALUE stFrameRateValue = {0};
     nRet =
         MV_CC_GetFloatValue(handle_, "AcquisitionFrameRate", &stFrameRateValue);
-    if (nRet == MV_OK) {
-      float maxFrameRate = stFrameRateValue.fMax;
+    if (nRet != MV_OK) {
+      RCLCPP_WARN(this->get_logger(),
+                  "Failed to query frame rate parameter: 0x%x", nRet);
+    } else {
       RCLCPP_INFO(this->get_logger(),
-                  "Current FrameRate: %.2f Hz, Max: %.2f Hz",
-                  stFrameRateValue.fCurValue, stFrameRateValue.fMax);
+                  "Current FrameRate: %.2f Hz, Range: [%.2f, %.2f] Hz",
+                  stFrameRateValue.fCurValue, stFrameRateValue.fMin,
+                  stFrameRateValue.fMax);
+    }
 
-      // 设置为最大帧率
+    // Step 5: 先设置合理的曝光时间（在当前帧率的约束下）
+    if (nRet == MV_OK && stExposureTime.fMin > 0) {
+      // 使用当前帧率或默认帧率计算合理的曝光时间
+      float currentFrameRate =
+          stFrameRateValue.fCurValue > 0 ? stFrameRateValue.fCurValue : 30.0f;
+      float frameIntervalUs = 1000000.0f / currentFrameRate;
+
+      // 曝光时间为帧间隔的 80%（留出较多裕度）
+      float targetExposureTime = frameIntervalUs * 0.8f;
+
+      // 确保在有效范围内
+      if (targetExposureTime < stExposureTime.fMin) {
+        targetExposureTime = stExposureTime.fMin;
+      }
+      if (targetExposureTime > stExposureTime.fMax) {
+        targetExposureTime = stExposureTime.fMax;
+      }
+
+      RCLCPP_INFO(this->get_logger(),
+                  "Calculated exposure time: %.2f μs (frame rate: %.2f Hz, "
+                  "interval: %.2f μs)",
+                  targetExposureTime, currentFrameRate, frameIntervalUs);
+
+      nRet = MV_CC_SetFloatValue(handle_, "ExposureTime", targetExposureTime);
+      if (nRet == MV_OK) {
+        RCLCPP_INFO(this->get_logger(), "ExposureTime set to: %.2f μs",
+                    targetExposureTime);
+      } else {
+        RCLCPP_ERROR(
+            this->get_logger(),
+            "Failed to set exposure time: 0x%x\n"
+            "  Hint: Check if ExposureAuto or ExposureMode needs adjustment",
+            nRet);
+        // 不中断初始化流程，继续尝试后续参数设置
+      }
+    }
+
+    // Step 6: 然后设置为最大帧率
+    if (nRet == MV_OK && stFrameRateValue.fMax > 0) {
+      float maxFrameRate = stFrameRateValue.fMax;
       nRet = MV_CC_SetFloatValue(handle_, "AcquisitionFrameRate", maxFrameRate);
       if (nRet == MV_OK) {
         RCLCPP_INFO(this->get_logger(),
@@ -147,56 +225,6 @@ class CameraNode : public rclcpp::Node {
         RCLCPP_WARN(this->get_logger(),
                     "Failed to set maximum frame rate: 0x%x", nRet);
       }
-    } else {
-      RCLCPP_WARN(this->get_logger(),
-                  "Failed to query frame rate parameter: 0x%x", nRet);
-    }
-
-    // 查询并设置曝光时间
-    // 在最大帧率下，曝光时间需要在帧间隔之内
-    MVCC_FLOATVALUE stExposureTime = {0};
-    nRet = MV_CC_GetFloatValue(handle_, "ExposureTime", &stExposureTime);
-    if (nRet == MV_OK) {
-      RCLCPP_INFO(this->get_logger(),
-                  "Current ExposureTime: %.2f μs, Range: [%.2f, %.2f] μs",
-                  stExposureTime.fCurValue, stExposureTime.fMin,
-                  stExposureTime.fMax);
-
-      // 计算最大可用曝光时间（基于当前帧率）
-      // 帧间隔(微秒) = 1000000 / 帧率(Hz)
-      MVCC_FLOATVALUE stCurrentFrameRate = {0};
-      nRet = MV_CC_GetFloatValue(handle_, "AcquisitionFrameRate",
-                                 &stCurrentFrameRate);
-
-      if (nRet == MV_OK && stCurrentFrameRate.fCurValue > 0) {
-        float frameIntervalUs = 1000000.0f / stCurrentFrameRate.fCurValue;
-        // 通常曝光时间应该小于帧间隔的 90%，以留出帧读取时间
-        float maxExposureTime = frameIntervalUs * 0.9f;
-
-        // 确保在允许范围内
-        if (maxExposureTime > stExposureTime.fMax) {
-          maxExposureTime = stExposureTime.fMax;
-        }
-
-        RCLCPP_INFO(
-            this->get_logger(),
-            "Frame interval: %.2f μs, Max recommended exposure: %.2f μs",
-            frameIntervalUs, maxExposureTime);
-
-        // 设置曝光时间为推荐最大值
-        nRet = MV_CC_SetFloatValue(handle_, "ExposureTime", maxExposureTime);
-        if (nRet == MV_OK) {
-          RCLCPP_INFO(this->get_logger(),
-                      "ExposureTime set to: %.2f μs (at maximum frame rate)",
-                      maxExposureTime);
-        } else {
-          RCLCPP_ERROR(this->get_logger(), "Failed to set exposure time: 0x%x",
-                       nRet);
-        }
-      }
-    } else {
-      RCLCPP_WARN(this->get_logger(),
-                  "Failed to query exposure time parameter: 0x%x", nRet);
     }
 
     nRet = MV_CC_RegisterImageCallBackEx2(handle_, &CameraNode::ImageCallback,
