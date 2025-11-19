@@ -8,7 +8,6 @@
 
 | 内容 | 说明 |
 |------|------|
-| 🚀 [快速开始](#快速开始-15-分钟) | 15 分钟完成第一次标定 |
 | 📖 [功能列表](#功能概览) | 6 个核心模块介绍 |
 | 📚 [详细文档](#详细使用) | 完整的命令行参考 |
 | 🎯 [应用示例](#应用示例) | C++/Python 集成示例 |
@@ -85,37 +84,6 @@
   ✅ AprilTag：apriltag_result.yaml（可选）
   ✅ 去畸变图像：undistorted/（可选）
 ```
-
----
-
-## 🚀 快速开始 (15 分钟)
-
-**前置条件**：Ubuntu 22.04, ROS2 Humble, OpenCV 4.5+, CMake 3.10+, Python 3.8+
-
-**第 1 步：编译项目**
-```bash
-cd ~/cam_intrinsic_calib
-colcon build --symlink-install
-source install/setup.bash
-```
-
-**第 2 步：采集标定图像（20-50 张，12×9 棋盘格）**
-```bash
-# 采集到 ./images 目录（不同位置和角度，确保清晰）
-ros2 run cam_intrinsic_calib camera_node --ros-args \
-  -p image_save_path:=./images
-```
-
-**第 3 步：运行标定并验证**
-```bash
-# 内参标定
-./install/cam_intrinsic_calib/lib/cam_intrinsic_calib/calibrate_camera ./images
-
-# 验证结果
-python3 analyze_calibration.py camera_calibration.yaml
-```
-
-✅ 若重投影误差 RMS < 1.0 px，标定成功！
 
 ---
 
@@ -214,10 +182,9 @@ python3 analyze_calibration.py camera_calib.yaml \
 
 ```bash
 ./install/cam_intrinsic_calib/lib/cam_intrinsic_calib/extrinsic_calib \
-  image.jpg \
+  ./extrinsic/20251118_144406_106.jpg \
   camera_calib.yaml \
-  --world-points world_points.txt \
-  --image-points image_points.txt \
+  --manual-mark \
   --output extrinsic.yaml
 ```
 
@@ -593,65 +560,23 @@ colcon build --symlink-install
 2. 内参计算：`cv::calibrateCamera()` 求解相机矩阵 K 和畸变系数
 3. 精度评估：重投影误差 RMS
 
-### 代码结构
-
-```
-src/
-├── calibrate_camera.cpp      内参标定主程序
-├── camera_node.cpp           ROS2 图像采集节点
-├── undistort_camera.cpp      图像去畸变程序
-├── extrinsic_calib.cpp       外参标定程序
-└── apriltag_detector.cpp     AprilTag 识别程序
-```
-
-### 性能指标
-
-- 支持图像格式：BMP, JPG, PNG
-- 棋盘格规格：12×9（可配置）
-- 推荐图像数：20-50 张
-- 标定时间：< 5 秒
-- 内存占用：< 100 MB
-- 重投影误差：< 0.5 px（优秀）
-
----
 
 ## 📁 项目结构
 
 ```
 cam_intrinsic_calib/
 ├── src/                      C++ 源代码
-│   ├── calibrate_camera.cpp
-│   ├── camera_node.cpp
-│   ├── undistort_camera.cpp
-│   ├── extrinsic_calib.cpp
-│   └── apriltag_detector.cpp
+│   ├── calibrate_camera.cpp  内参标定主程序
+│   ├── camera_node.cpp       ROS2 图像采集节点
+│   ├── undistort_camera.cpp  图像去畸变程序
+│   ├── extrinsic_calib.cpp   外参标定程序
+│   └── apriltag_detector.cpp AprilTag 识别程序
 ├── include/                  头文件和 SDK
 ├── README.md                 本文档
 ├── calibrate.sh              快速启动脚本
 ├── analyze_calibration.py    结果分析工具
 ├── CMakeLists.txt            编译配置
 └── package.xml               ROS2 包配置
-```
-
----
-
-## 🔗 依赖项
-
-**必需**：
-- OpenCV 4.5+ (calibrateCamera, ArUco for AprilTag)
-- CMake 3.10+
-- C++17 编译器 (GCC 7+ or Clang 5+)
-- ROS2 Humble (可选，仅用于 camera_node)
-
-**安装**（Ubuntu 22.04）：
-```bash
-sudo apt install -y build-essential cmake libopencv-dev python3-pip
-
-# ROS2（可选）
-sudo apt install -y ros-humble-ros-core ros-humble-ament-cmake
-
-# Python 依赖
-pip3 install opencv-python numpy
 ```
 
 ---
