@@ -59,8 +59,16 @@ target_link_libraries(extrinsic_calib
   ${OpenCV_LIBS}
 )
 
+# 可执行文件5: apriltag_detector (AprilTag 检测和位姿求解工具)
+add_executable(apriltag_detector src/apriltag_detector.cpp)
+
+# 为 apriltag_detector 链接 OpenCV (包括 ArUco 模块)
+target_link_libraries(apriltag_detector
+  ${OpenCV_LIBS}
+)
+
 # 安装可执行文件
-install(TARGETS camera_node calibrate_camera undistort_camera extrinsic_calib
+install(TARGETS camera_node calibrate_camera undistort_camera extrinsic_calib apriltag_detector
   RUNTIME DESTINATION lib/${PROJECT_NAME}  # 可执行文件安装到 lib/${PROJECT_NAME} 目录
 )
 
