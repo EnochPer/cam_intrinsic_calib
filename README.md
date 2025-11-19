@@ -1,367 +1,279 @@
-# 相机内参标定工具包
+# 相机内参和外参标定工具包
 
-> 使用棋盘格标定板自动计算相机内参矩阵和畸变系数的完整解决方案
+> 完整的相机标定解决方案：内参标定、外参标定、AprilTag 识别、图像去畸变
 > 
-> **优化相机**: Sony IMX264 (2448×2048, 6mm 镜头)
+> 支持**海康威视**相机采集，优化 **Sony IMX264** (2448×2048, 6mm 镜头)
 
-## 📋 目录
+## � 快速导航
 
-- [功能概览](#功能概览)
-- [快速开始](#快速开始)
-- [详细使用](#详细使用)
-- [标定结果](#标定结果)
-- [应用示例](#应用示例)
-- [常见问题](#常见问题)
-- [技术细节](#技术细节)
+| 内容 | 说明 |
+|------|------|
+| 🚀 [快速开始](#快速开始-15-分钟) | 15 分钟完成第一次标定 |
+| 📖 [功能列表](#功能概览) | 6 个核心模块介绍 |
+| 📚 [详细文档](#详细使用) | 完整的命令行参考 |
+| 🎯 [应用示例](#应用示例) | C++/Python 集成示例 |
+| ❓ [问题解答](#常见问题) | 常见问题和解决方案 |
+| 🔬 [技术细节](#技术细节) | 算法原理和性能指标 |
 
 ---
 
-## 📦 功能概览
+## 功能概览
 
-### 核心模块
+### 📦 核心模块一览
 
 | 模块 | 功能 | 语言 | 说明 |
 |------|------|------|------|
-| `camera_node` | 图像采集 | C++ | ROS2 节点，支持海康威视相机 |
-| `calibrate_camera` | 内参标定 | C++ | 自动检测棋盘格，计算内参 |
-| `undistort_camera` | 图像去畸变 | C++ | 读取标定结果，对图像去除畸变 |
-| `extrinsic_calib` | 外参标定 | C++ | 已知控制点坐标，计算相机姿态 |
-| `analyze_calibration.py` | 结果分析 | Python | 验证标定质量，多格式导出 |
-| `calibrate.sh` | 快速启动 | Bash | 一键完整标定流程 |
+| `camera_node` | 图像采集 | C++ | ROS2 节点，支持海康威视相机实时采集 |
+| `calibrate_camera` | 内参标定 | C++ | 自动检测棋盘格，计算相机内参矩阵和畸变系数 |
+| `undistort_camera` | 图像去畸变 | C++ | 批量处理图像，消除镜头畸变 |
+| `extrinsic_calib` | 外参标定 | C++ | 计算相机相对世界坐标系的位姿（旋转和平移） |
+| `apriltag_detector` | 标签识别 | C++ | 识别 AprilTag，计算其在世界坐标系中的位姿 |
+| `analyze_calibration.py` | 结果分析 | Python | 验证标定质量，支持多格式导出 |
 
-### 工作流程
+### 完整工作流程
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   相机标定完整流程图                        │
+│              相机标定 - 完整工作流程                        │
 └─────────────────────────────────────────────────────────────┘
 
-【第一阶段】内参标定
-  采集 20-50 张棋盘格图像 (camera_node)
-              ↓
-  自动检测棋盘格角点 (calibrate_camera)
-              ↓
-  计算相机内参矩阵 K (3×3)
-              ↓
-  估计畸变系数 (5 参数)
-              ↓
-  自动验证标定质量 (analyze_calibration.py)
-              ↓
-  输出内参 YAML 文件 (camera_calibration.yaml)
+【阶段 1️⃣】内参标定（必需）
+  📸 使用相机采集 30-50 张棋盘格图像
+           ↓
+  🔍 自动检测棋盘格角点，计算相机内参矩阵 K(3×3)
+           ↓
+  📊 计算 5 个畸变系数（径向 3 个，切向 2 个）
+           ↓
+  ✅ 验证标定质量（重投影误差），输出 YAML 文件
+           ↓
+  📁 结果：camera_calibration.yaml
 
 
-【第二阶段】图像处理（可选）
-  ┌──────────────────────────────┐
-  │ 使用内参去除图像畸变         │
-  │ undistort_camera             │
-  │ - 读取内参文件               │
-  │ - 批量处理图像               │
-  │ - 输出去畸变结果             │
-  └──────────────────────────────┘
+【阶段 2️⃣】图像处理（可选）
+  🖼️  批量去除图像畸变，生成校正后的图像
+           ↓
+  📁 结果：undistorted/ 文件夹
 
 
-【第三阶段】外参标定（可选）
-  准备已知坐标的世界控制点 (20 个 1×1 棋盘格点)
-              ↓
-  标记或提供这些点在图像中的像素坐标
-              ↓
-  运行外参标定程序 (extrinsic_calib)
-              ↓
-  计算相机旋转矩阵 R (3×3)
-              ↓
-  计算相机平移向量 t (3×1)
-              ↓
-  输出外参 YAML 文件 (extrinsic.yaml)
-              ↓
-  获得完整的相机姿态信息
+【阶段 3️⃣】外参标定（可选）
+  📍 定义世界坐标系中的 17 个控制点
+           ↓
+  🖱️  手动或自动在图像中标记这些点的像素坐标
+           ↓
+  🎯 使用 PnP 算法计算相机的旋转矩阵 R(3×3) 和平移向量 t(3×1)
+           ↓
+  📊 验证外参合理性（正交性、行列式、重投影误差）
+           ↓
+  📁 结果：extrinsic.yaml
 
-【最终结果】
-  内参: camera_calibration.yaml
-  外参: extrinsic.yaml (可选)
-  去畸变图像: output_directory (可选)
+
+【阶段 4️⃣】AprilTag 识别（可选）
+  🏷️  在图像中检测 AprilTag 标记
+           ↓
+  📐 计算标签在相机坐标系中的位姿
+           ↓
+  🌍 基于外参，变换到世界坐标系
+           ↓
+  📊 输出每个标签的位置和姿态
+           ↓
+  📁 结果：apriltag_result.yaml
+
+
+【最终输出】
+  ✅ 内参：camera_calibration.yaml（必需）
+  ✅ 外参：extrinsic.yaml（可选）
+  ✅ AprilTag：apriltag_result.yaml（可选）
+  ✅ 去畸变图像：undistorted/（可选）
 ```
 
 ---
 
 ## 🚀 快速开始 (15 分钟)
 
-### 前置条件
+**前置条件**：Ubuntu 22.04, ROS2 Humble, OpenCV 4.5+, CMake 3.10+, Python 3.8+
 
+**第 1 步：编译项目**
 ```bash
-# 必需
-- Ubuntu 22.04 LTS
-- ROS2 Humble (或基于 Ubuntu 22.04 的其他版本)
-- OpenCV 4.5+
-- CMake 3.10+
-- C++17 编译器
-- Python 3.8+
-
-# 可选
-- 海康威视 MVS SDK (仅用于 camera_node)
-```
-
-### 第 1 步：编译项目 (2 分钟)
-
-```bash
-#建立工作空间
-mkidr ~/hikon_cam
-cd ~/hikon_cam
-mkdir src/
-git clone https://github.com/EnochPer/cam_intrinsic_calib.git
-cd ../..
-colcon build --packages-select cam_intrinsic_calib
+cd ~/cam_intrinsic_calib
+colcon build --symlink-install
 source install/setup.bash
 ```
 
-### 第 2 步：采集标定图像 (5-10 分钟)
-
-使用 ROS2 节点采集 20-50 张标定板图像。标定板为 **12×9 黑白棋盘格**。
-
+**第 2 步：采集标定图像（20-50 张，12×9 棋盘格）**
 ```bash
-# 基本用法
+# 采集到 ./images 目录（不同位置和角度，确保清晰）
 ros2 run cam_intrinsic_calib camera_node --ros-args \
-  -p image_save_path:=/home/zzh/Pictures/hik
-
-# 调整采集帧率（默认 1 fps）
-ros2 run cam_intrinsic_calib camera_node --ros-args \
-  -p image_save_path:=/home/zzh/Pictures/hik \
-  -p capture_fps:=2
+  -p image_save_path:=./images
 ```
 
-**采集要点：**
-- ✓ 采集 20-50 张图像（推荐 30-40 张）
-- ✓ 棋盘格应在不同位置（中心、四角、边缘）
-- ✓ 棋盘格应在不同角度（俯仰、偏航、横滚）
-- ✓ 确保光照充足，图像清晰
-- ✓ 整个 12×9 棋盘格完全可见
-
-### 第 3 步：运行标定 (1-2 分钟)
-
+**第 3 步：运行标定并验证**
 ```bash
-# 方法 A：使用快速脚本（推荐）
-cd ~/hikon_cam/src/cam_intrinsic_calib
-chmod +x calibrate.sh
-./calibrate.sh ~/Pictures/hik
+# 内参标定
+./install/cam_intrinsic_calib/lib/cam_intrinsic_calib/calibrate_camera ./images
 
-# 方法 B：直接运行
-./install/cam_intrinsic_calib/lib/cam_intrinsic_calib/calibrate_camera \
-  ~/Pictures/hik --output camera_calib.yaml --square-size 45
-```
-
-### 第 4 步：验证结果 (1 分钟)
-
-```bash
+# 验证结果
 python3 analyze_calibration.py camera_calibration.yaml
 ```
 
-**预期输出：**
-```
-╔════════════════════════════════════════╗
-║       标定结果验证                      ║
-╚════════════════════════════════════════╝
-
-✓ 图像数量充足 (28/30)
-✓ 重投影误差良好 (0.42 px)
-✓ 焦距合理 (fx=1234, fy=1234)
-✓ 光心位置正确 (cx=640, cy=480)
-✓ 畸变系数正常
-
-📊 精度评级: ⭐⭐⭐⭐⭐ 优秀
-✅ 标定结果良好，可以使用
-```
+✅ 若重投影误差 RMS < 1.0 px，标定成功！
 
 ---
 
 ## 📚 详细使用
 
-### 命令行参数
-
-#### `calibrate_camera`
+### 编译和安装
 
 ```bash
-用法: calibrate_camera <image_directory> [options]
+# 进入工作空间
+cd ~/cam_intrinsic_calib
 
-必需参数:
-  <image_directory>    标定图像所在目录
+# 清理旧的编译文件（首次或遇到编译错误时）
+rm -rf build install log
 
-可选参数:
-  --output <filename>     输出文件名 (默认: camera_calibration.yaml)
-  --square-size <mm>      棋盘格方块边长，单位mm (默认: 20)
-  --display               显示棋盘格检测结果（调试用）
-  --help                  显示帮助信息
+# 编译项目（推荐使用符号链接便于快速开发）
+colcon build --symlink-install
 
-示例:
-  # 基本标定
-  ./calibrate_camera ~/Pictures/hik
+# 或仅编译本包
+colcon build --packages-select cam_intrinsic_calib --symlink-install
 
-  # 自定义方块大小
-  ./calibrate_camera ~/Pictures/hik --square-size 25
+# 加载环境
+source install/setup.bash
 
-  # 显示检测过程并自定义输出文件
-  ./calibrate_camera ~/Pictures/hik --output my_calib.yaml --display
+# 验证编译成功
+ls install/cam_intrinsic_calib/lib/cam_intrinsic_calib/
 ```
 
-#### `analyze_calibration.py`
+预期输出：camera_node, calibrate_camera, undistort_camera, extrinsic_calib, apriltag_detector 等可执行文件
+
+### 命令行工具参考
+
+#### 1. `camera_node` - 图像采集
 
 ```bash
-用法: python3 analyze_calibration.py <calibration_file> [options]
-
-必需参数:
-  <calibration_file>    标定结果 YAML 文件
-
-可选参数:
-  --numpy <output>      导出为 NumPy 格式 (.npy)
-  --text <output>       导出为文本格式 (.txt)
-  --check-only          仅进行有效性检查，不显示详细参数
-  --help                显示帮助信息
-
-示例:
-  # 基本分析
-  python3 analyze_calibration.py camera_calibration.yaml
-
-  # 多格式导出
-  python3 analyze_calibration.py camera_calib.yaml \
-    --numpy calib_data.npy --text calib_result.txt
-
-  # 仅检查有效性
-  python3 analyze_calibration.py camera_calib.yaml --check-only
+ros2 run cam_intrinsic_calib camera_node --ros-args \
+  -p image_save_path:=./images \
+  -p capture_fps:=1 \
+  -p enable_auto_exposure:=true
 ```
 
-#### `undistort_camera` - 图像去畸变
+**参数说明**：
+- `image_save_path`：图像保存目录（默认 ./images）
+- `capture_fps`：采集帧率，fps（默认 1）
+- `enable_auto_exposure`：是否启用自动曝光（默认 true）
+- `exposure_time`：手动曝光时间，μs（默认 20000）
+
+#### 2. `calibrate_camera` - 内参标定
 
 ```bash
-用法: undistort_camera <intrinsic_yaml> <input_image_dir> [options]
-
-必需参数:
-  <intrinsic_yaml>      相机内参文件（YAML格式，来自 calibrate_camera）
-  <input_image_dir>     输入图像目录
-
-可选参数:
-  --output <dir>        输出目录 (默认: ./undistorted)
-  --alpha <value>       缩放因子 (0.0-1.0, 默认: 0.0)
-                        - 0.0: 移除所有黑色边界
-                        - 1.0: 保留所有原始像素
-  --format <ext>        输出图像格式 (默认: png)
-                        可选: png, jpg, bmp
-  --help                显示帮助信息
-
-示例:
-  # 基本用法
-  undistort_camera camera_calibration.yaml ./raw_images
-
-  # 自定义输出目录和格式
-  undistort_camera camera_calibration.yaml ./raw_images \
-    --output ./corrected --format jpg
-
-  # 保留所有原始像素（不裁剪黑边）
-  undistort_camera camera_calibration.yaml ./raw_images \
-    --output ./corrected --alpha 1.0
+./install/cam_intrinsic_calib/lib/cam_intrinsic_calib/calibrate_camera \
+  ./images \
+  --square-size 20 \
+  --output camera_calib.yaml \
+  --display
 ```
 
-**功能说明：**
-- ✓ 批量处理输入目录中的所有图像（支持 BMP/JPG/PNG）
-- ✓ 应用相机内参中的畸变系数进行校正
-- ✓ 支持自定义输出目录和格式
-- ✓ 显示处理进度和统计信息
-- ✓ 自动创建输出目录
+**参数说明**：
+- `<image_dir>`：（必需）包含标定图像的目录
+- `--square-size <mm>`：棋盘格方块大小（mm），默认 20
+- `--output <file>`：输出 YAML 文件名，默认 camera_calibration.yaml
+- `--display`：显示检测过程（可选，用于调试）
 
-#### `extrinsic_calib` - 外参标定
+#### 3. `analyze_calibration.py` - 结果分析
 
 ```bash
-用法: extrinsic_calib <image_file> <intrinsic_yaml> [options]
-
-必需参数:
-  <image_file>          输入图像（包含棋盘格和控制点）
-  <intrinsic_yaml>      相机内参文件（来自 calibrate_camera）
-
-可选参数:
-  --world-points <file> 世界坐标系控制点文件
-                        格式：每行一个点，3个值用空格分隔 (x y z)
-                        默认：自动生成 4×5 的 1×1 棋盘格点
-  --image-points <file> 图像坐标系控制点文件
-                        格式：每行一个点，2个值用空格分隔 (x y)
-                        如果不提供，会要求用户在图像上交互式点击
-  --output <file>       输出外参文件名 (默认: extrinsic.yaml)
-  --show-board          显示棋盘格点标记结果
-  --help                显示帮助信息
-
-示例:
-  # 使用默认棋盘格，交互式标记
-  extrinsic_calib photo.jpg camera_calibration.yaml
-
-  # 使用已有的控制点文件
-  extrinsic_calib photo.jpg camera_calibration.yaml \
-    --world-points points_3d.txt \
-    --image-points points_2d.txt
-
-  # 自定义输出文件
-  extrinsic_calib photo.jpg camera_calibration.yaml \
-    --world-points points_3d.txt \
-    --image-points points_2d.txt \
-    --output my_extrinsic.yaml
+python3 analyze_calibration.py camera_calib.yaml \
+  --numpy calib.npy \
+  --text calib.txt
 ```
 
-**功能说明：**
-- ✓ 使用 PnP 算法求解相机姿态
-- ✓ 支持已知世界坐标系控制点（20 个 1×1 棋盘格点）
-- ✓ 交互式标记模式（左键点击标记，右键撤销）
-- ✓ 自动计算重投影误差
-- ✓ 输出完整的旋转矩阵、旋转向量、平移向量
-- ✓ 验证外参合理性（正交性、行列式、重投影误差）
+**参数说明**：
+- `<calibration_file>`：（必需）YAML 格式的标定文件
+- `--numpy <file>`：导出为 NumPy 格式（可选）
+- `--text <file>`：导出为文本格式（可选）
+- `--check-only`：仅检查有效性，不显示详细参数
 
-**控制点文件格式：**
+#### 4. `undistort_camera` - 图像去畸变
 
-`world_points.txt` (世界坐标，单位 mm)：
-```
-0 0 0
-1 0 0
-2 0 0
-3 0 0
-4 0 0
-0 1 0
-1 1 0
-...
+```bash
+./install/cam_intrinsic_calib/lib/cam_intrinsic_calib/undistort_camera \
+  camera_calib.yaml \
+  ./images \
+  --output ./undistorted \
+  --alpha 0.0 \
+  --format png
 ```
 
-`image_points.txt` (图像坐标，单位像素)：
+**参数说明**：
+- `<intrinsic_yaml>`：（必需）内参 YAML 文件
+- `<input_dir>`：（必需）输入图像目录
+- `--output <dir>`：输出目录，默认 ./undistorted
+- `--alpha <0.0-1.0>`：图像缩放因子，0.0 移除黑边，1.0 保留全部，默认 0.0
+- `--format <ext>`：输出格式 png/jpg/bmp，默认 png
+
+#### 5. `extrinsic_calib` - 外参标定
+
+```bash
+./install/cam_intrinsic_calib/lib/cam_intrinsic_calib/extrinsic_calib \
+  image.jpg \
+  camera_calib.yaml \
+  --world-points world_points.txt \
+  --image-points image_points.txt \
+  --output extrinsic.yaml
 ```
-100.5 200.3
-150.2 200.1
-200.1 200.4
-250.0 200.0
-300.5 200.2
-100.0 250.5
-...
+
+**参数说明**：
+- `<image_file>`：（必需）包含棋盘格的图像
+- `<intrinsic_yaml>`：（必需）内参 YAML 文件
+- `--world-points <file>`：世界坐标控制点（可选，默认自动生成）
+- `--image-points <file>`：图像坐标控制点（可选，默认交互标记）
+- `--output <file>`：输出文件，默认 extrinsic.yaml
+
+**交互标记操作**：
+- 左键：标记一个点
+- 右键：撤销最后一个点
+- 滚轮：放大/缩小（0.25x - 4.0x）
+- 中键+拖动：平移
+- 'r'：重置
+- 'q'/ESC：完成
+
+#### 6. `apriltag_detector` - AprilTag 识别
+
+```bash
+./install/cam_intrinsic_calib/lib/cam_intrinsic_calib/apriltag_detector \
+  image.jpg \
+  camera_calib.yaml \
+  extrinsic.yaml \
+  0.15 \
+  --tag-family 36h11 \
+  --visualize \
+  --output result.yaml
 ```
+
+**参数说明**：
+- `<image>`：（必需）包含 AprilTag 的图像
+- `<intrinsic>`：（必需）内参 YAML 文件
+- `<extrinsic>`：（必需）外参 YAML 文件
+- `<tag_size>`：（必需）标签尺寸（米，如 15cm = 0.15）
+- `--tag-family <f>`：标签族，36h11（推荐）/25h9/16h5，默认 36h11
+- `--visualize`：显示识别结果和坐标轴（可选）
+- `--output <file>`：输出 YAML 文件，默认 apriltag_result.yaml
+
+**重要**：tag_size 的单位是**米**，不是毫米！
 
 ---
 
-### 标定图像要求
+## 🖼️ 标定图像要求
 
-#### 棋盘格规格
-- **尺寸**：12 列 × 9 行
-- **方块大小**：20-30mm（推荐 20mm）
-- **材质**：黑白印刷，高对比度
+**棋盘格**：12 列 × 9 行，方块大小 20-30mm，黑白高对比度
 
-#### 图像质量
-| 指标 | 要求 | 说明 |
-|------|------|------|
-| 格式 | BMP/JPG/PNG | 推荐 BMP（无损） |
-| 分辨率 | ≥640×480 | 推荐 1280×960+ |
-| 清晰度 | 棋盘格边界清晰 | 无运动模糊 |
-| 对比度 | 黑白对比度高 | 避免灰色区域 |
-| 曝光 | 既不过曝也不欠曝 | 细节清晰可见 |
+**图像质量**：格式 BMP/JPG/PNG（推荐 BMP），分辨率 ≥1280×960，清晰无运动模糊
 
-#### 采集多样性
-
-采集的图像应该包含：
-
-```
-位置覆盖:  中心  左上  右上  左下  右下  边缘
-角度覆盖:  正面  俯仰  偏航  横滚  组合
-
-目标: 20-50 张图像 (推荐 30-40 张)
-```
+**采集指南**：
+- 采集 20-50 张（推荐 30-40 张）
+- 不同位置：中心、四角、边缘
+- 不同角度：正面、俯视、仰视、侧倾
+- 光照充足，整个棋盘格完整可见
+- 检测成功率 ≥80%（通过 --display 查看）
 
 ### 输出文件
 
@@ -415,35 +327,9 @@ python3 analyze_calibration.py camera_calibration.yaml
 
 ---
 
-## 📊 标定结果
+## 📊 标定结果说明
 
-### 相机硬件规格
-
-本工具针对以下相机规格进行了优化：
-
-| 参数 | 值 |
-|------|-----|
-| 型号 | Sony IMX264 |
-| 分辨率 | 2448 × 2048 像素 |
-| 像元尺寸 | 3.45 × 3.45 μm |
-| 靶面尺寸 | 2/3" |
-| 传感器宽度 | 8.4456 mm |
-| 传感器高度 | 7.0656 mm |
-| 镜头焦距 | 6mm |
-| **理论焦距** | **1739.13 px** |
-
-**理论焦距计算公式**:
-$$f_{\text{px}} = \frac{F_{\text{mm}} \times \text{Image Width}_{\text{px}}}{\text{Sensor Width}_{\text{mm}}}$$
-
-**本相机的计算**:
-$$f = \frac{6 \text{ mm} \times 2448 \text{ px}}{8.4456 \text{ mm}} = 1739.13 \text{ px}$$
-
-其中：
-- $F_{\text{mm}}$ = 镜头标称焦距（6mm）
-- $\text{Image Width}_{\text{px}}$ = 图像宽度（2448 px）
-- $\text{Sensor Width}_{\text{mm}}$ = 传感器宽度（8.4456 mm）
-
-### 相机矩阵 (Camera Intrinsic Matrix)
+### 相机矩阵（内参）K
 
 $$K = \begin{pmatrix}
 f_x & 0 & c_x \\
@@ -451,111 +337,35 @@ f_x & 0 & c_x \\
 0 & 0 & 1
 \end{pmatrix}$$
 
-| 符号 | 含义 | 单位 | 说明 |
-|------|------|------|------|
-| $f_x, f_y$ | 焦距 | 像素 | 相机在 x/y 方向的焦距 |
-| $c_x, c_y$ | 光心/主点 | 像素 | 图像中心点坐标 |
+- $f_x, f_y$：焦距（像素），一般 500-3000 px
+- $c_x, c_y$：光心/主点（像素），通常接近图像中心
 
-**参考值：**
-- 网络摄像头：fx/fy ≈ 500-1500 px
-- 手机摄像头：fx/fy ≈ 1000-3000 px
-- 工业相机：取决于镜头，可以更大
+**本相机参考值**（Sony IMX264，2448×2048，6mm 镜头）：
+- 理论焦距：1739.13 px
+- 期望范围（±5%）：1652.2 - 1826.1 px
 
-### 畸变系数 (5 参数模型)
+### 畸变系数（5 参数）
 
-| 参数 | 含义 | 影响 |
-|------|------|------|
-| $k_1, k_2, k_3$ | 径向畸变 | 桶形/枕形失真 |
-| $p_1, p_2$ | 切向畸变 | 由镜头不完全平行引起 |
+| 系数 | 含义 | 典型值 |
+|------|------|--------|
+| $k_1, k_2$ | 径向畸变 | -0.1 ~ 0.3 |
+| $k_3$ | 径向畸变（高阶） | -0.01 ~ 0.01 |
+| $p_1, p_2$ | 切向畸变 | -0.01 ~ 0.01 |
 
-典型值：
-```
-k1: -0.1 ~ 0.3     (常见负值)
-k2: -0.1 ~ 0.1
-k3: -0.01 ~ 0.01   (通常很小)
-p1, p2: -0.01 ~ 0.01
-```
+### 精度评估（重投影误差 RMS）
 
-### 精度评估 (重投影误差 RMS)
-
-| RMS 误差 | 精度评级 | 适用场景 |
-|---------|---------|---------|
+| RMS | 评级 | 应用场景 |
+|-----|------|---------|
 | < 0.5 px | ⭐⭐⭐⭐⭐ 优秀 | 精密测量、3D 重建 |
 | 0.5-1.0 px | ⭐⭐⭐⭐ 良好 | 普通视觉应用 |
-| 1.0-2.0 px | ⭐⭐⭐ 可接受 | 要求不高的应用 |
-| > 2.0 px | ⭐⭐ 需改进 | 需要重新采集或调整 |
+| 1.0-2.0 px | ⭐⭐⭐ 可接受 | 一般应用 |
+| > 2.0 px | ⚠️ 需改进 | 重新采集和调整 |
 
 ---
 
 ## 💻 应用示例
 
-### 完整工作流程示例
-
-#### 场景：标定 Sony IMX264 相机，进行去畸变，并求解相机姿态
-
-```bash
-# 第 1 步：采集标定图像（30 张）
-mkdir -p ~/hik_images
-ros2 run cam_intrinsic_calib camera_node --ros-args \
-  -p image_save_path:=$HOME/hik_images
-
-# 第 2 步：运行内参标定
-cd ~/hikon_cam/install/cam_intrinsic_calib/lib/cam_intrinsic_calib
-./calibrate_camera ~/hik_images --output camera_calib.yaml --square-size 20
-
-# 第 3 步：验证标定结果
-python3 analyze_calibration.py camera_calib.yaml
-
-# 第 4 步：对包含失真的图像进行去畸变（可选）
-./undistort_camera camera_calib.yaml ~/hik_images --output ~/hik_undistorted
-
-# 第 5 步：准备外参标定（可选）
-# 创建控制点文件
-gedit world_points.txt
-
-# 第 6 步：进行外参标定（使用一张包含棋盘格的照片）
-./extrinsic_calib ~/hik_images/image_001.bmp camera_calib.yaml \
-  --world-points world_points.txt --output extrinsic.yaml
-
-# 最终输出：
-# - camera_calib.yaml      (内参)
-# - extrinsic.yaml         (外参，可选)
-# - ~/hik_undistorted/      (去畸变图像目录，可选)
-```
-
-### C++ 中使用标定结果
-
-```cpp
-#include <opencv2/opencv.hpp>
-
-// 加载标定结果
-cv::FileStorage fs("camera_calibration.yaml", cv::FileStorage::READ);
-cv::Mat K = fs["camera_matrix"].mat();
-cv::Mat dist = fs["distortion_coefficients"].mat();
-fs.release();
-
-// 方法1: 直接矫正
-cv::Mat image = cv::imread("test.jpg");
-cv::Mat undistorted;
-cv::undistort(image, undistorted, K, dist);
-
-// 方法2: 获得优化的相机矩阵（裁剪黑边）
-cv::Mat new_K;
-cv::Rect roi;
-new_K = cv::getOptimalNewCameraMatrix(K, dist, image.size(), 1, image.size(), &roi);
-cv::Mat map1, map2;
-cv::initUndistortRectifyMap(K, dist, cv::Mat(), new_K, image.size(), CV_32F, map1, map2);
-cv::Mat result;
-cv::remap(image, result, map1, map2, cv::INTER_LINEAR);
-
-// 显示结果
-cv::imshow("Original", image);
-cv::imshow("Undistorted", undistorted);
-cv::waitKey(0);
-```
-
 ### Python 中使用标定结果
-
 ```python
 import cv2
 import numpy as np
@@ -566,407 +376,209 @@ K = fs.getNode("camera_matrix").mat()
 dist = fs.getNode("distortion_coefficients").mat()
 fs.release()
 
-# 方法1: 直接矫正
+# 方法 1: 直接去畸变
 image = cv2.imread("test.jpg")
 undistorted = cv2.undistort(image, K, dist)
 
-# 方法2: 获得优化的相机矩阵
+# 方法 2: 优化相机矩阵（自动裁剪黑边）
 h, w = image.shape[:2]
 new_K, roi = cv2.getOptimalNewCameraMatrix(K, dist, (w, h), 1, (w, h))
 map1, map2 = cv2.initUndistortRectifyMap(K, dist, None, new_K, (w, h), cv2.CV_32F)
 result = cv2.remap(image, map1, map2, cv2.INTER_LINEAR)
 
-# 进行 3D 重建或立体视觉（后续操作）
-# 从像素坐标转换到相机坐标系
-def pixel_to_camera(uv, depth, K):
-    """像素坐标 + 深度 -> 相机坐标"""
-    fx = K[0, 0]
-    fy = K[1, 1]
-    cx = K[0, 2]
-    cy = K[1, 2]
-    x = (uv[0] - cx) * depth / fx
-    y = (uv[1] - cy) * depth / fy
-    return np.array([x, y, depth])
-
-# ============ 外参使用示例 ============
-# 加载外参结果（如果有的话）
+# 外参使用：世界坐标 -> 相机坐标 -> 图像坐标
 fs = cv2.FileStorage("extrinsic.yaml", cv2.FILE_STORAGE_READ)
-R = fs.getNode("rotation_matrix").mat()        # 旋转矩阵 (3×3)
-t = fs.getNode("translation_vector").mat()    # 平移向量 (3×1)
-rvec = fs.getNode("rotation_vector").mat()    # 旋转向量 (3×1)
+R = fs.getNode("rotation_matrix").mat()
+t = fs.getNode("translation_vector").mat()
 fs.release()
 
-# 已知世界坐标系下的 3D 点
 world_point = np.array([[10.0], [20.0], [30.0]])  # mm
-
-# 将世界坐标转换到相机坐标系
 camera_point = R @ world_point + t
-print(f"世界坐标: {world_point.T}")
-print(f"相机坐标: {camera_point.T}")
-
-# 将相机坐标投影到图像上
 image_point = K @ camera_point / camera_point[2]
 print(f"图像坐标: ({image_point[0, 0]}, {image_point[1, 0]})")
-
-# 计算欧拉角（参考）
-def rotation_matrix_to_euler(R):
-    """旋转矩阵 -> 欧拉角 (roll, pitch, yaw)"""
-    sy = np.sqrt(R[0, 0]**2 + R[1, 0]**2)
-    singular = sy < 1e-6
-    
-    if not singular:
-        x = np.arctan2(R[2, 1], R[2, 2])
-        y = np.arctan2(-R[2, 0], sy)
-        z = np.arctan2(R[1, 0], R[0, 0])
-    else:
-        x = np.arctan2(-R[1, 2], R[1, 1])
-        y = np.arctan2(-R[2, 0], sy)
-        z = 0
-    
-    return np.array([x, y, z]) * 180 / np.pi  # 转换为度数
-
-euler = rotation_matrix_to_euler(R)
-print(f"欧拉角 (degrees): Roll={euler[0]:.2f}, Pitch={euler[1]:.2f}, Yaw={euler[2]:.2f}")
 ```
 
-### 外参标定的使用场景
-
-**外参标定用于：**
-1. **坐标转换**：将世界坐标系的点转换到相机坐标系或图像坐标系
-2. **相机定位**：确定相机在世界坐标系中的位置和姿态
-3. **3D 重建**：多个相机的外参用于立体视觉或多视图重建
-4. **视觉测量**：精确测量物体在世界坐标系中的位置
-5. **机器人控制**：用于机器人视觉伺服和抓取控制
-
-**坐标变换关系：**
-```
-世界坐标 (x_w, y_w, z_w)
-         ↓ (外参: R, t)
-相机坐标 (x_c, y_c, z_c) = R*X_w + t
-         ↓ (内参: K)
-图像坐标 (u, v) = K*(x_c/z_c, y_c/z_c)
-```
-
-### ROS2 中加载和使用
-
+### C++ 中使用标定结果
 ```cpp
-// 在 ROS2 节点中使用标定结果
-#include <rclcpp/rclcpp.hpp>
-#include <sensor_msgs/msg/image.hpp>
 #include <opencv2/opencv.hpp>
-#include <cv_bridge/cv_bridge.h>
 
-class CameraCalibrationNode : public rclcpp::Node {
-public:
-    CameraCalibrationNode() : Node("camera_calibration") {
-        // 加载标定参数
-        cv::FileStorage fs("camera_calibration.yaml", cv::FileStorage::READ);
-        K_ = fs["camera_matrix"].mat();
-        dist_ = fs["distortion_coefficients"].mat();
-        fs.release();
-        
-        // 订阅原始图像
-        sub_ = create_subscription<sensor_msgs::msg::Image>(
-            "/camera/image_raw", 10,
-            std::bind(&CameraCalibrationNode::imageCallback, this, std::placeholders::_1));
-        
-        // 发布矫正后的图像
-        pub_ = create_publisher<sensor_msgs::msg::Image>("/camera/image_undistorted", 10);
-    }
-    
-private:
-    void imageCallback(const sensor_msgs::msg::Image::SharedPtr msg) {
-        // 转换为 OpenCV 格式
-        cv::Mat image = cv_bridge::toCvShare(msg)->image.clone();
-        
-        // 矫正失真
-        cv::Mat undistorted;
-        cv::undistort(image, undistorted, K_, dist_);
-        
-        // 发布结果
-        auto out_msg = cv_bridge::CvImage(msg->header, "bgr8", undistorted).toImageMsg();
-        pub_->publish(*out_msg);
-    }
-    
-    cv::Mat K_, dist_;
-    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_;
-    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_;
-};
+cv::FileStorage fs("camera_calibration.yaml", cv::FileStorage::READ);
+cv::Mat K = fs["camera_matrix"].mat();
+cv::Mat dist = fs["distortion_coefficients"].mat();
+fs.release();
+
+// 去畸变
+cv::Mat image = cv::imread("test.jpg");
+cv::Mat undistorted;
+cv::undistort(image, undistorted, K, dist);
+
+// 使用外参进行坐标变换
+cv::Mat R, t;
+fs.open("extrinsic.yaml", cv::FileStorage::READ);
+fs["rotation_matrix"] >> R;
+fs["translation_vector"] >> t;
+fs.release();
+```
+
+### 完整工作流程示例
+
+```bash
+# 第 1 步：采集 30-50 张标定图像（不同位置和角度）
+ros2 run cam_intrinsic_calib camera_node --ros-args -p image_save_path:=./images
+
+# 第 2 步：运行内参标定
+./calibrate_camera ./images --square-size 20 --output camera_calib.yaml
+
+# 第 3 步：验证标定质量（RMS 应 < 1.0 px）
+python3 analyze_calibration.py camera_calib.yaml
+
+# 第 4 步：去畸变处理（可选）
+./undistort_camera camera_calib.yaml ./images --output ./undistorted
+
+# 第 5 步：外参标定（可选，用包含棋盘格的图像）
+./extrinsic_calib ./images/image_001.bmp camera_calib.yaml
+
+# 第 6 步：AprilTag 识别（可选，若有 AprilTag）
+./apriltag_detector test_image.jpg camera_calib.yaml extrinsic.yaml 0.15 --visualize
+```
+
+### 标定结果输出文件
+
+**camera_calibration.yaml** 示例：
+```yaml
+image_width: 2448
+image_height: 2048
+image_count: 30
+
+camera_matrix: !!opencv-matrix
+  rows: 3
+  cols: 3
+  data: [1739.13, 0, 1224.0, 0, 1739.13, 1024.0, 0, 0, 1]
+
+distortion_coefficients: !!opencv-matrix
+  rows: 5
+  cols: 1
+  data: [0.05, -0.1, 0, 0, 0]
+
+reprojection_error: 0.42
+```
+
+**extrinsic.yaml** 示例：
+```yaml
+rotation_matrix: !!opencv-matrix
+  rows: 3
+  cols: 3
+  data: [0.998, -0.015, 0.062, 0.012, 0.999, 0.035, -0.063, -0.033, 0.998]
+
+translation_vector: !!opencv-matrix
+  rows: 3
+  cols: 1
+  data: [50.2, 30.5, 200.3]
 ```
 
 ---
 
-## 🎥 曝光时间设置失败问题解决
-
-**问题**: 出现 `Failed to set exposure time: 0x80000102` 错误
-
-**根本原因**: 海康相机存在参数互锁问题：
-- 启用自动曝光时无法手动设置曝光时间
-- 改变帧率后设置曝光时间会超出新的有效范围
-- 参数设置顺序不当导致冲突
-
-**解决方案** (已在代码中实施):
-1. 禁用自动曝光: `MV_CC_SetEnumValue(handle_, "ExposureAuto", 0)`
-2. 设置手动模式: `MV_CC_SetEnumValue(handle_, "ExposureMode", 0)`
-3. 查询参数范围并计算合理的曝光时间
-4. **先设置曝光时间** (基于当前帧率)
-5. **再设置帧率** (关键！避免值超出新范围)
-
-**验证方法**:
-```bash
-ros2 run cam_intrinsic_calib camera_node 2>&1 | grep -i "exposure\|framerate"
-```
-
-预期成功输出:
-```
-[INFO] Auto Exposure disabled
-[INFO] Exposure mode set to Manual
-[INFO] ExposureTime set to: XXX.XX μs
-[INFO] AcquisitionFrameRate set to maximum: XX.XX Hz
-```
+---
 
 ---
 
-## 📷 相机配置（Sony IMX264）
+## 📷 相机配置和参数
 
-本工具针对 Sony IMX264 相机优化：
-
-| 参数 | 值 |
-|------|-----|
-| 分辨率 | 2448 × 2048 像素 |
-| 像元尺寸 | 3.45 × 3.45 μm |
-| 传感器宽度 | 8.4456 mm |
-| 镜头焦距 | 6mm |
-| **理论焦距** | **1739.13 px** |
-| **期望范围 (±5%)** | **1652.2 - 1826.1 px** |
-
-**焦距计算公式**：$f = \frac{镜头焦距 \times 分辨率}{传感器宽度}$
-
-**修改其他相机参数**（在 `calibrate_camera.cpp` 第 50-80 行）：
-```cpp
-static const int CAMERA_WIDTH = 2448;
-static const int CAMERA_HEIGHT = 2048;
-static const float LENS_FOCAL_LENGTH_MM = 6.0f;
-static const float SENSOR_WIDTH_MM = 8.4456f;
-```
-
----
-
-## 🖱️ 外参标定（v3.0 更新）
-
-**重大改进**：
-1. ✅ **移除自动识别**：流程简化，用户完全控制关键点位置
-2. ✅ **默认 2 倍缩放**：启动时自动显示 200% 缩放，便于精确标记
-3. ✅ **十字标记**：改为十字样式，中心指示清晰，精度提升 3 倍
-
-### 使用方法
-
-```bash
-# 基本用法
-./extrinsic_calib image.jpg camera_calib.yaml
-
-# 自定义世界坐标点
-./extrinsic_calib image.jpg camera_calib.yaml --world-points custom_points.txt
-
-# 自定义输出文件
-./extrinsic_calib image.jpg camera_calib.yaml --output my_extrinsic.yaml
-```
-
-### 手动标记操作
-
-| 操作 | 快捷键 |
-|------|--------|
-| 标记点 | 左键 |
-| 撤销 | 右键 |
-| 放大 | 滚轮上 ↑ |
-| 缩小 | 滚轮下 ↓ |
-| 平移 | 中键+拖动 |
-| 重置 | 'r' |
-| 完成 | 'q' / ESC |
-
-**特点**：
-- 初始显示 200% 缩放（2 倍）
-- 支持 0.25x ~ 4.0x 缩放范围
-- 十字标记，中心位置清晰
-- 坐标自动转换回原始分辨率
-
-### 控制点坐标格式
-
-**world_points.txt** (世界坐标，单位 mm)：
-```
-0 0 0
-1 0 0
-2 0 0
-...（共 17 个点）
-```
-
-**image_points.txt** (图像坐标，单位像素，可选)：
-```
-100.5 200.3
-150.2 200.1
-...（与世界坐标对应）
-```
-
----
-
-## ⚠️ 常见问题
-
-### Q1: 无法检测到棋盘格
-
-**可能原因和解决方案：**
-
-1. **棋盘格规格不对**
-   - 确认棋盘格为 12×9（列×行）
-   - 如果是其他规格，修改 `calibrate_camera.cpp` 中的常量：
-     ```cpp
-     const int CHESSBOARD_COLS = 12;  // 修改这里
-     const int CHESSBOARD_ROWS = 9;   // 修改这里
-     ```
-   - 重新编译：`colcon build --packages-select cam_intrinsic_calib`
-
-2. **图像质量问题**
-   ```bash
-   # 使用 --display 查看检测过程
-   ./calibrate_camera ~/Pictures/hik --display
-   ```
-   - 检查黑白对比度
-   - 确保光照充足
-   - 避免反光和阴影
-
-3. **棋盘格不完整**
-   - 重新采集，确保整个棋盘格都在图像中
-   - 避免棋盘格被切割
-
-4. **图像格式问题**
-   - 确认图像为 BMP/JPG/PNG 格式
-   - 避免使用损坏的文件
-
-**调试步骤：**
-```bash
-# 1. 检查图像目录
-ls ~/Pictures/hik/ | head -5
-
-# 2. 运行标定并显示结果
-./calibrate_camera ~/Pictures/hik --display
-
-# 3. 查看程序输出中的检测成功率
-# 如果成功率 < 50%，需要改进图像采集条件
-```
-
-### Q2: 重投影误差很大（RMS > 2.0 px）
-
-**可能原因和解决方案：**
-
-1. **标定图像数量或质量不足**
-   - 增加采集图像数量至 40-50 张
-   - 确保图像多样性（不同位置和角度）
-
-2. **方块大小设置错误**
-   ```bash
-   # 确认实际棋盘格方块大小，然后使用 --square-size
-   ./calibrate_camera ~/Pictures/hik --square-size 25
-   ```
-   - 默认值为 20mm
-   - 如果棋盘格打印时缩放了，需要调整此参数
-
-3. **棋盘格打印不精确**
-   - 检查打印的棋盘格是否变形（特别是在纸张边缘）
-   - 使用高质量的印刷棋盘格
-   - 避免使用手工绘制的棋盘格
-
-4. **相机参数不稳定**
-   - 重新采集所有标定图像
-   - 确保采集过程中相机参数（焦距、光圈）不变
-
-**改进步骤：**
-```bash
-# 1. 重新采集更多高质量图像
-ros2 run cam_intrinsic_calib camera_node --ros-args \
-  -p image_save_path:=/home/zzh/Pictures/hik_v2
-
-# 2. 验证方块大小
-# 使用尺子测量实际棋盘格方块大小
-
-# 3. 使用正确的参数运行标定
-./calibrate_camera ~/Pictures/hik_v2 --square-size 20
-
-# 4. 检查结果
-python3 analyze_calibration.py camera_calibration.yaml
-```
-
-### Q3: 焦距值看起来不对
-
-**焦距的理解：**
-
-焦距（像素值）= 实际焦距（mm） × 分辨率（像素/mm） / 传感器尺寸
-
-**本相机的焦距预期范围：**
-
-对于**本项目相机（Sony IMX264，2448×2048，6mm 镜头）**：
+### Sony IMX264 相机规格（默认配置）
 
 | 参数 | 值 | 说明 |
 |------|-----|------|
-| 型号 | Sony IMX264 | 实际相机型号 |
-| 镜头焦距 | 6 mm | 标称焦距 |
-| 分辨率 | 2448 × 2048 px | 实际采集分辨率 |
+| 分辨率 | 2448 × 2048 px | 采集分辨率 |
 | 像元尺寸 | 3.45 × 3.45 μm | 像元规格 |
 | 传感器宽度 | 8.4456 mm | 2448 × 3.45 / 1000 |
+| 镜头焦距 | 6 mm | 标称焦距 |
 | **理论焦距** | **1739.13 px** | 6 × 2448 / 8.4456 |
-| **期望范围 (±5%)** | **1652.2 - 1826.1 px** | 标定结果应落在此范围 |
-| **广泛范围 (0.8-1.5×)** | **1958.4 - 3672.0 px** | 异常检测的边界 |
+| **期望范围** | **1652-1826 px** | ±5% 的理想范围 |
 
-**验证方法（针对本相机）：**
+### 修改其他相机参数
 
-```python
-# 用 Sony IMX264 实际参数验证标定结果
-import math
+如果使用不同的相机，编辑 `src/calibrate_camera.cpp` 第 50-80 行：
 
-# 标定得到的焦距
-fx = 1739.13  # 示例值（理想情况）
+```cpp
+static const int CAMERA_WIDTH = 2448;        // 图像宽度（像素）
+static const int CAMERA_HEIGHT = 2048;       // 图像高度（像素）
+static const float LENS_FOCAL_LENGTH_MM = 6.0f;    // 镜头焦距（mm）
+static const float SENSOR_WIDTH_MM = 8.4456f;      // 传感器宽度（mm）
 
-# 已知参数
-sensor_width_mm = 8.4456  # Sony IMX264 传感器宽度（毫米）
-image_width_px = 2448     # 图像宽度（像素）
-lens_focal_length = 6     # 镜头标称焦距（毫米）
-
-# 计算等效焦距
-pixel_size = sensor_width_mm / image_width_px  # mm/px
-equivalent_focal_length = fx * pixel_size  # mm
-
-print(f"标定焦距(等效): {equivalent_focal_length:.2f}mm")
-print(f"镜头标称焦距: {lens_focal_length}mm")
-print(f"差异: {abs(equivalent_focal_length - lens_focal_length):.2f}mm")
-
-# 评判标准：
-# 差异 < 0.3mm: 优秀 ⭐⭐⭐⭐⭐
-# 差异 < 0.8mm: 良好 ⭐⭐⭐⭐
-# 差异 < 1.5mm: 可接受 ⭐⭐⭐
-# 差异 > 1.5mm: 需要检查 ⚠️
+// 棋盘格规格
+static const int CHESSBOARD_COLS = 12;       // 棋盘格列数
+static const int CHESSBOARD_ROWS = 9;        // 棋盘格行数
 ```
 
-**标定结果自动校验**：
+修改后重新编译：
+```bash
+colcon build --packages-select cam_intrinsic_calib --symlink-install
+```
 
-程序运行时会自动进行如下校验：
+### 焦距计算公式
 
-1. **严格范围检查** (±5%)
-   - ✓ 焦距应在 1652.2 - 1826.1 px 范围内
-   - 这是理想情况下的最可能范围
+理论焦距 = 镜头焦距(mm) × 图像宽度(px) / 传感器宽度(mm)
 
-2. **广泛范围检查** (0.8-1.5×分辨率)
-   - ✓ 焦距应在 1958.4 - 3672.0 px 范围内
-   - 这是数据仍然可用的范围
+$$f_{\text{px}} = \frac{F \times W_{\text{px}}}{W_{\text{mm}}}$$
 
-3. **等效焦距验证**
-   - ✓ 等效焦距与镜头标称焦距的差异应 < 1.5mm
-   - 差异 < 0.3mm 为优秀，< 0.8mm 为良好
+**示例**：对于不同焦距的镜头
+- 4mm 镜头 + 2448 px：4 × 2448 / 8.4456 = 1159.42 px
+- 6mm 镜头 + 2448 px：6 × 2448 / 8.4456 = 1739.13 px（本项目）
+- 8mm 镜头 + 2448 px：8 × 2448 / 8.4456 = 2318.84 px
 
-4. **光心位置检查**
-   - ✓ 光心应在图像 10%-90% 范围内
+---
 
-5. **畸变系数检查**
-   - ✓ 畸变系数应在正常范围内
+### Q1：无法检测到棋盘格
+- 检查棋盘格规格是否为 12×9
+- 运行 `calibrate_camera --display` 查看检测过程
+- 重新采集：确保高对比度、充足光照、整个棋盘格可见
+- 修改 calibrate_camera.cpp 中的棋盘格参数后重新编译
 
-如果校验失败，程序会显示具体的警告信息和改进建议。详见 **CAMERA_CONFIG.md** 了解完整的校验标准。
+### Q2：重投影误差很大（RMS > 2.0 px）
+- 增加采集数量至 50 张
+- 验证方块大小是否正确（用尺子测量）
+- 确保采集的多样性（不同位置和角度）
+- 检查棋盘格打印质量，避免变形
+
+### Q3：焦距值看起来不对
+**本相机理论焦距计算**：
+$$f = \frac{6 \text{ mm} \times 2448 \text{ px}}{8.4456 \text{ mm}} = 1739.13 \text{ px}$$
+
+期望范围（±5%）：1652.2 - 1826.1 px
+
+验证脚本：
+```python
+# 标定得到的焦距
+fx = 1739.13
+sensor_width = 8.4456  # mm
+image_width = 2448     # px
+pixel_size = sensor_width / image_width
+equiv_focal_length = fx * pixel_size  # mm
+print(f"等效焦距: {equiv_focal_length:.2f}mm (应接近 6.0mm)")
+```
+
+### Q4：外参标定点标记不准确
+- 使用 `--visualize` 标志查看标记效果
+- 可以滚轮放大至 4× 以提高精度
+- 使用预先设定的控制点文件（更精确）
+
+### Q5：AprilTag 未能识别
+- 确认图像中确实有 AprilTag
+- 检查 tag_size 单位是否为米（0.15 = 15cm，不是毫米）
+- 尝试不同的 tag-family：36h11（推荐）、25h9、16h5
+
+### Q6：编译错误
+常见错误及解决：
+- `error: 'cv::Mat' was not declared` → 检查 OpenCV 头文件引入
+- `undefined reference to 'cv::calibrateCamera'` → 检查 CMakeLists.txt 中的库链接
+- `fatal error: MvCameraControl.h: No such file` → 仅在使用 camera_node 时需要海康 SDK
+
+清理并重新编译：
+```bash
+cd ~/cam_intrinsic_calib
+rm -rf build install log
+colcon build --symlink-install
+```
 
 ---
 
@@ -974,126 +586,68 @@ print(f"差异: {abs(equivalent_focal_length - lens_focal_length):.2f}mm")
 
 ### 标定算法
 
-本项目使用的是经典的 **Zhang's method**（张正友标定法），通过 OpenCV 的 `cv::calibrateCamera()` 实现。
+使用经典的 **Zhang's method**（张正友标定法），通过 OpenCV 的 `cv::calibrateCamera()` 实现。
 
-**关键步骤：**
-
-1. **棋盘格检测**
-   ```cpp
-   // 自适应阈值 + 边缘检测
-   cv::findChessboardCorners(
-       image, Size(12, 9), corners,
-       CALIB_CB_ADAPTIVE_THRESH | CALIB_CB_NORMALIZE_IMAGE);
-   
-   // 亚像素精化（重要！提高精度）
-   cv::cornerSubPix(
-       gray, corners, Size(11, 11), Size(-1, -1),
-       TermCriteria(COUNT | EPS, 30, 0.001));
-   ```
-
-2. **内参计算**
-   ```cpp
-   double rms = cv::calibrateCamera(
-       objectPoints, imagePoints, imageSize,
-       K, dist, rvecs, tvecs,
-       CALIB_FIX_PRINCIPAL_POINT);
-   ```
-
-3. **精度评估**
-   - 重投影误差：计算标定板对应的 3D 点投影到图像后的误差
-   - 误差越小，标定越精确
+**关键步骤**：
+1. 棋盘格检测：`cv::findChessboardCorners()` + 亚像素精化 `cv::cornerSubPix()`
+2. 内参计算：`cv::calibrateCamera()` 求解相机矩阵 K 和畸变系数
+3. 精度评估：重投影误差 RMS
 
 ### 代码结构
 
 ```
-calibrate_camera.cpp
-├── main()
-│   └── CalibrationAnalyzer analyzer
-│       ├── readImagePaths()          读取图像列表
-│       ├── detectChessboardCorners() 棋盘格检测
-│       ├── extractCornerPoints()     角点提取
-│       ├── calibrateCamera()         内参计算
-│       ├── printCalibrationResult()  打印结果
-│       └── saveCalibrationToYAML()   保存结果
-│
-└── struct CalibrationResult
-    ├── K (camera_matrix)
-    ├── dist (distortion_coefficients)
-    ├── rvecs (rotation_vectors)
-    ├── tvecs (translation_vectors)
-    └── rms_error
+src/
+├── calibrate_camera.cpp      内参标定主程序
+├── camera_node.cpp           ROS2 图像采集节点
+├── undistort_camera.cpp      图像去畸变程序
+├── extrinsic_calib.cpp       外参标定程序
+└── apriltag_detector.cpp     AprilTag 识别程序
 ```
 
 ### 性能指标
 
-| 指标 | 值 |
-|------|-----|
-| 支持图像格式 | BMP, JPG, PNG |
-| 棋盘格规格 | 12×9（可配置） |
-| 推荐图像数 | 20-50 张 |
-| 标定时间 | < 5 秒 |
-| 重投影误差 | < 0.5 px（优秀） |
-| 内存占用 | < 100 MB |
+- 支持图像格式：BMP, JPG, PNG
+- 棋盘格规格：12×9（可配置）
+- 推荐图像数：20-50 张
+- 标定时间：< 5 秒
+- 内存占用：< 100 MB
+- 重投影误差：< 0.5 px（优秀）
 
 ---
 
-## 📁 项目文件结构
+## 📁 项目结构
 
 ```
 cam_intrinsic_calib/
-├── src/
-│   ├── camera_node.cpp              # 图像采集 ROS2 节点
-│   ├── calibrate_camera.cpp         # 标定计算程序
-│   └── SimpleCapture.cpp            # 参考程序
-│
-├── include/cam_intrinsic_calib/
-│   ├── MvCameraControl.h            # 海康 SDK 头文件
-│   ├── CameraParams.h
-│   ├── PixelType.h
-│   └── ...（其他 SDK 头文件）
-│
-├── 📖 文档
-│   └── README.md                    # 本文件（完整文档）
-│
-├── 🛠️ 工具
-│   ├── calibrate.sh                 # 快速启动脚本
-│   ├── analyze_calibration.py       # 结果分析工具
-│   └── QuickReference.md            # SDK 快速参考
-│
-└── 📋 配置
-    ├── CMakeLists.txt               # 编译配置
-    └── package.xml                  # ROS2 包配置
+├── src/                      C++ 源代码
+│   ├── calibrate_camera.cpp
+│   ├── camera_node.cpp
+│   ├── undistort_camera.cpp
+│   ├── extrinsic_calib.cpp
+│   └── apriltag_detector.cpp
+├── include/                  头文件和 SDK
+├── README.md                 本文档
+├── calibrate.sh              快速启动脚本
+├── analyze_calibration.py    结果分析工具
+├── CMakeLists.txt            编译配置
+└── package.xml               ROS2 包配置
 ```
 
 ---
 
 ## 🔗 依赖项
 
-### 必需
-- **OpenCV 4.5+** - 图像处理和标定算法
-- **CMake 3.10+** - 构建系统
-- **C++17 编译器** - GCC 7+ 或 Clang 5+
+**必需**：
+- OpenCV 4.5+ (calibrateCamera, ArUco for AprilTag)
+- CMake 3.10+
+- C++17 编译器 (GCC 7+ or Clang 5+)
+- ROS2 Humble (可选，仅用于 camera_node)
 
-### 可选
-- **ROS2 Humble** - 仅用于 `camera_node`
-- **海康威视 MVS SDK** - 仅用于 `camera_node`
-- **Python 3.8+** - 仅用于 `analyze_calibration.py`
-
-### 安装依赖（Ubuntu 22.04）
-
+**安装**（Ubuntu 22.04）：
 ```bash
-# 基础依赖
-sudo apt install -y \
-    build-essential \
-    cmake \
-    git \
-    libopencv-dev \
-    python3-pip
+sudo apt install -y build-essential cmake libopencv-dev python3-pip
 
 # ROS2（可选）
-curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | sudo apt-key add -
-sudo apt install -y software-properties-common
-sudo add-apt-repository "deb [arch=$(dpkg --print-architecture)] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main"
 sudo apt install -y ros-humble-ros-core ros-humble-ament-cmake
 
 # Python 依赖
@@ -1102,165 +656,30 @@ pip3 install opencv-python numpy
 
 ---
 
-## 📞 获取帮助
-
-**遇到问题？按顺序查看：**
-
-1. 本文档的 [常见问题](#常见问题) 部分
-2. 代码中的详细注释（`calibrate_camera.cpp`）
-3. OpenCV 官方文档：https://docs.opencv.org/
-
----
-
-## 🎯 AprilTag 识别和位姿求解
-
-### 概述
-
-本项目新增了 **AprilTag 识别和位姿求解** 功能，可以：
-
-1. ✅ **识别图像中的 AprilTag 标记** (支持 tag36h11, tag25h9, tag16h5)
-2. ✅ **计算标签在相机坐标系中的位姿** (旋转矩阵和平移向量)
-3. ✅ **坐标系变换到世界坐标系** (基于已知的相机外参)
-4. ✅ **多标签同时识别** 和 **结果可视化**
-
-### 快速使用
-
-```bash
-# 基本用法 (标签尺寸为 15cm)
-./apriltag_detector image.jpg camera_calib.yaml extrinsic.yaml 0.15
-
-# 带可视化显示
-./apriltag_detector image.jpg camera_calib.yaml extrinsic.yaml 0.15 --visualize
-
-# 自定义标签族和输出
-./apriltag_detector image.jpg camera_calib.yaml extrinsic.yaml 0.15 \
-  --tag-family 25h9 --output result.yaml
-```
-
-### 命令行参数
-
-```
-用法: apriltag_detector <image> <intrinsic> <extrinsic> <tag_size> [options]
-
-必需参数:
-  <image>               输入图像文件
-  <intrinsic>          相机内参 YAML 文件
-  <extrinsic>          相机外参 YAML 文件
-  <tag_size>           AprilTag 尺寸（米，如 0.15 = 15cm）
-
-可选参数:
-  --tag-family <f>     标签族 (36h11|25h9|16h5, 默认: 36h11)
-  --output <file>      输出文件 (默认: apriltag_result.yaml)
-  --visualize          显示识别结果和坐标轴
-  --help               显示帮助
-```
-
-### 工作流程
-
-```
-输入图像 (包含 AprilTag)
-    ↓
-检测 AprilTag 标记 (cv::aruco::detectMarkers)
-    ↓
-估计位姿 (相机坐标系) (cv::aruco::estimatePoseSingleMarkers)
-    ↓
-坐标系变换 (相机→世界) (T_world_tag = T_world_cam * T_cam_tag)
-    ↓
-输出结果 (控制台 + YAML 文件 + 可视化)
-```
-
-### 输出结果示例
-
-```
-[步骤] 检测 AprilTag 标记...
-  检测到 2 个标记
-  ├─ 标记 ID: 42
-  │  位置 (相机坐标系): (100.12, 200.46, 500.79) mm
-  ├─ 标记 ID: 15
-  │  位置 (相机坐标系): (-150.23, 50.12, 450.57) mm
-
-════════════════════════════════════════════════════════════
-                    AprilTag 识别结果
-════════════════════════════════════════════════════════════
-
-─ AprilTag #42
-
-  [相机坐标系]
-    位置: (100.12, 200.46, 500.79) mm
-    旋转角度: 15.23°
-
-  [世界坐标系]
-    位置 (右前上):
-      X (向右): 1234.56 mm
-      Y (向前): 567.89 mm
-      Z (向上): -123.45 mm
-    旋转角度: 1.01°
-```
-
-### 坐标系说明
-
-**世界坐标系** (Right-Forward-Up):
-- X 轴: 向右
-- Y 轴: 向前
-- Z 轴: 向上
-
-**相机坐标系** (标准):
-- X 轴: 向右
-- Y 轴: 向下
-- Z 轴: 向前 (光轴)
-
-**坐标变换公式**:
-```
-P_world = R_cam_world * P_camera + t_cam_world
-
-其中:
-  R_cam_world = R_world_cam^T  (逆旋转)
-  t_cam_world = -R_cam_world * t_world_cam
-```
-
-### 技术规范
-
-| 项 | 说明 |
-|---|------|
-| **算法** | OpenCV ArUco 模块 |
-| **支持标签族** | tag36h11 (推荐), tag25h9, tag16h5 |
-| **精度** | ±2-5 mm (相对于标签尺寸 0.5%-1%) |
-| **处理时间** | ~150ms (一张图像) |
-| **多标签支持** | ✅ 完全支持 |
-| **可视化** | ✅ 支持坐标轴显示 |
-
-### 编译和部署
-
-```bash
-# 编译（自动包含）
-cd ~/cam_intrinsic_calib
-colcon build --packages-select cam_intrinsic_calib
-
-# 运行
-source install/setup.bash
-./install/cam_intrinsic_calib/lib/cam_intrinsic_calib/apriltag_detector image.jpg calib.yaml ext.yaml 0.15
-```
-
-### AprilTag 常见问题
-
-**Q1: 未检测到任何 AprilTag**
-- A: 检查图像中是否存在 AprilTag，确保标签清晰可见，尝试不同的 --tag-family
-
-**Q2: 位姿结果不合理**
-- A: 验证内参和外参文件是否正确，确认 tag_size 单位是米（不是毫米）
-
-**Q3: 如何处理多个不同 ID 的标签**
-- A: 自动支持，程序会检测所有标签并分别计算位姿
-
----
-
-## 📈 版本历史
+## � 版本历史
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
 | 1.0 | 2025-11-13 | 初始发布 |
-| 2.0 | 2025-11-19 | 添加 AprilTag 识别功能 |
+| 2.0 | 2025-11-19 | 添加 AprilTag 功能并精简文档 |
 
 ---
 
-**最后更新**: 2025 年 11 月 19 日
+## 🎯 AprilTag 识别
+
+**功能**：识别 AprilTag 标记，计算其在世界坐标系中的位置和姿态
+
+**使用**：
+```bash
+./apriltag_detector <image> <intrinsic> <extrinsic> <tag_size_m> [--visualize]
+```
+
+**支持**：tag36h11 (推荐), tag25h9, tag16h5
+
+**输出**：YAML 文件包含每个标签的世界坐标系位置和姿态
+
+**注意**：tag_size 单位为米（如 15cm = 0.15）
+
+---
+
+**最后更新**：2025 年 11 月 19 日
