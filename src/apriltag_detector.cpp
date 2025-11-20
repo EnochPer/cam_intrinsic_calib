@@ -1,12 +1,12 @@
 /**
  * @file apriltag_detector.cpp
- * @brief AprilTag 识别和位姿求解程序
+ * @brief AprilTag 识别和位姿求解程序（使用官方 apriltag3 库）
  *
  * @details
  *   该程序实现了以下功能：
  *   1. 读取相机内参文件（YAML格式）
  *   2. 读取相机的外参文件（相对世界坐标系）
- *   3. 识别图像中的 AprilTag 标记
+ *   3. 使用官方 apriltag 库识别图像中的 AprilTag 标记
  *   4. 计算 AprilTag 在相机坐标系中的位姿
  *   5. 通过相机外参变换，计算 AprilTag 在世界坐标系中的位姿
  *   6. 显示识别结果和位姿信息
@@ -18,29 +18,42 @@
  *
  * @usage
  *   ./apriltag_detector <image_file> <intrinsic_yaml> <extrinsic_yaml>
- * <tag_size>
- *   ./apriltag_detector <image_file> <intrinsic_yaml> <extrinsic_yaml>
- * <tag_size> [options]
+ *   <tag_size> [options]
  *
  * @example
  *   ./apriltag_detector photo.jpg camera_calib.yaml extrinsic.yaml 0.15
  *   ./apriltag_detector photo.jpg camera_calib.yaml extrinsic.yaml 0.15
  * --output result.yaml
  *   ./apriltag_detector photo.jpg camera_calib.yaml extrinsic.yaml 0.15
- * --visualize
+ * --tag-family 41h12 --visualize
  */
 
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <opencv2/aruco.hpp>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
+
+// AprilTag 库头文件
+extern "C" {
+#include "apriltag.h"
+#include "apriltag_pose.h"
+#include "tag16h5.h"
+#include "tag25h9.h"
+#include "tag36h10.h"
+#include "tag36h11.h"
+#include "tagCircle21h7.h"
+#include "tagCircle49h12.h"
+#include "tagCustom48h12.h"
+#include "tagStandard41h12.h"
+#include "tagStandard52h13.h"
+}
 
 using namespace cv;
 using namespace std;
@@ -118,7 +131,7 @@ struct AprilTagWorldPose {
  */
 void printUsage(const char* programName) {
   cout << "\n════════════════════════════════════════════════════════════\n";
-  cout << "          AprilTag 识别和位姿求解程序 (基于相机标定)\n";
+  cout << "      AprilTag 识别和位姿求解程序 (基于 apriltag3 库)\n";
   cout << "════════════════════════════════════════════════════════════\n\n";
   cout << "用法:\n";
   cout << "  " << programName
@@ -132,18 +145,14 @@ void printUsage(const char* programName) {
       << "  <tag_size>             AprilTag 标签尺寸（米，如 0.15 = 15cm）\n\n";
   cout << "可选参数:\n";
   cout << "  --tag-family <family>  AprilTag 标签族\n";
-  cout << "                         支持: 36h11, 25h9, 16h5 (默认: 36h11)\n";
+  cout << "                         支持: 16h5, 25h9, 36h10, 36h11,\n";
+  cout << "                                circle21h7, circle49h12,\n";
+  cout << "                                custom48h12,\n";
+  cout << "                                41h12 (推荐, 默认),\n";
+  cout << "                                52h13\n";
   cout << "  --output <file>        输出结果文件 (YAML格式)\n";
   cout << "  --visualize            显示识别结果和坐标系\n";
   cout << "  --help                 显示此帮助信息\n\n";
-  cout << "说明:\n";
-  cout << "  - 本程序使用 OpenCV 的 ArUco 模块识别 AprilTag\n";
-  cout << "  - AprilTag 在 ArUco 字典中的对应关系：\n";
-  cout << "    * DICT_APRILTAG_36h11 ← tag36h11（推荐）\n";
-  cout << "    * DICT_APRILTAG_25h9  ← tag25h9\n";
-  cout << "    * DICT_APRILTAG_16h5  ← tag16h5\n";
-  cout << "  - 输入图像应为未去畸变的原始图像\n";
-  cout << "  - 标签尺寸应为标签的物理宽度（从内边缘到内边缘）\n\n";
   cout << "════════════════════════════════════════════════════════════\n\n";
 }
 
@@ -216,25 +225,20 @@ CameraExtrinsics readExtrinsicsFromYAML(const string& filename) {
 
 /**
  * @brief 检测图像中的 AprilTag
- * @param image 输入图像
- * @param tagSize AprilTag 尺寸（米）
- * @param cameraMatrix 相机矩阵
- * @param distCoeffs 畸变系数
- * @param dictId ArUco 字典 ID
- * @return 检测到的标签列表
  */
 vector<AprilTagDetection> detectAprilTags(const Mat& image, double tagSize,
                                           const Mat& cameraMatrix,
-                                          const Mat& distCoeffs, int dictId) {
+                                          const Mat& distCoeffs,
+                                          apriltag_family_t* tf) {
   vector<AprilTagDetection> detections;
 
   cout << "[步骤] 检测 AprilTag 标记...\n";
   cout << "════════════════════════════════════════════════════════════\n";
   cout << "  标签尺寸: " << fixed << setprecision(4) << tagSize << " m\n";
 
-  // 获取 ArUco 字典 (使用 OpenCV 4.3+ 的 API)
-  cv::Ptr<cv::aruco::Dictionary> dict =
-      cv::aruco::getPredefinedDictionary(dictId);
+  // 创建检测器
+  apriltag_detector_t* td = apriltag_detector_create();
+  apriltag_detector_add_family(td, tf);
 
   // 转换为灰度图像
   Mat gray;
@@ -244,58 +248,93 @@ vector<AprilTagDetection> detectAprilTags(const Mat& image, double tagSize,
     gray = image.clone();
   }
 
-  // 检测标记 (使用更兼容的 API)
-  vector<int> ids;
-  vector<vector<Point2f>> corners;
-  cv::aruco::detectMarkers(gray, dict, corners, ids);
+  // 转换为 apriltag 需要的 image_u8_t 格式
+  image_u8_t* img_u8 = image_u8_create(gray.cols, gray.rows);
 
-  cout << "  检测到 " << ids.size() << " 个标记\n";
+  for (int y = 0; y < gray.rows; ++y) {
+    memcpy(&img_u8->buf[y * img_u8->stride], gray.ptr(y), gray.cols);
+  }
 
-  if (ids.empty()) {
+  // 检测标记
+  zarray_t* detections_array = apriltag_detector_detect(td, img_u8);
+  int num_detections = zarray_size(detections_array);
+
+  cout << "  检测到 " << num_detections << " 个标记\n";
+
+  if (num_detections == 0) {
     cout << "  [警告] 未检测到任何 AprilTag\n";
     cout << "════════════════════════════════════════════════════════════\n";
-    return detections;
-  }
+  } else {
+    cout << "  [成功] " << num_detections << " 个标记检测完毕\n";
+    cout << "════════════════════════════════════════════════════════════\n";
 
-  // 为每个检测到的标记估计位姿
-  vector<Mat> rvecs, tvecs;
-  cv::aruco::estimatePoseSingleMarkers(corners, tagSize, cameraMatrix,
-                                       distCoeffs, rvecs, tvecs);
+    // 获取相机内参以用于位姿估计
+    apriltag_detection_info_t info;
+    info.det = nullptr;
+    info.tagsize = tagSize;
+    info.fx = cameraMatrix.at<double>(0, 0);
+    info.fy = cameraMatrix.at<double>(1, 1);
+    info.cx = cameraMatrix.at<double>(0, 2);
+    info.cy = cameraMatrix.at<double>(1, 2);
 
-  cout << "  [" << ids.size() << "] 标记检测成功\n";
+    // 处理每个检测到的标记
+    for (int i = 0; i < num_detections; ++i) {
+      apriltag_detection_t* det = nullptr;
+      zarray_get(detections_array, i, &det);
 
-  for (size_t i = 0; i < ids.size(); ++i) {
-    AprilTagDetection detection;
-    detection.tagId = ids[i];
-    detection.corners = corners[i];
+      if (det == nullptr) continue;
 
-    // 计算中心点
-    Point2f center(0, 0);
-    for (const auto& corner : corners[i]) {
-      center += corner;
+      AprilTagDetection detection;
+      detection.tagId = det->id;
+
+      // 提取四个角点和中心
+      for (int j = 0; j < 4; ++j) {
+        detection.corners.push_back(Point2f(det->p[j][0], det->p[j][1]));
+      }
+      detection.center = Point2f(det->c[0], det->c[1]);
+
+      // 估计位姿
+      info.det = det;
+      apriltag_pose_t pose = estimate_tag_pose(&info);
+
+      // 转换位姿到 OpenCV 格式
+      // pose.R 是 3×3 旋转矩阵，pose.t 是 3×1 平移向量
+      detection.rotationMatrix = Mat(3, 3, CV_64F);
+      for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) {
+          detection.rotationMatrix.at<double>(r, c) = pose.R->data[r][c];
+        }
+      }
+
+      detection.translationVector = Mat(3, 1, CV_64F);
+      for (int r = 0; r < 3; ++r) {
+        detection.translationVector.at<double>(r, 0) = pose.t->data[r];
+      }
+
+      // 转换为旋转向量
+      Rodrigues(detection.rotationMatrix, detection.rotationVector);
+
+      detection.isValid = true;
+      detections.push_back(detection);
+
+      cout << "  ├─ 标记 ID: " << detection.tagId << "\n";
+      cout << "  │  位置 (相机坐标系): (" << fixed << setprecision(3)
+           << detection.translationVector.at<double>(0, 0) << ", "
+           << detection.translationVector.at<double>(1, 0) << ", "
+           << detection.translationVector.at<double>(2, 0) << ") m\n";
+
+      // 清理位姿结构体
+      matd_destroy(pose.R);
+      matd_destroy(pose.t);
     }
-    center *= 0.25f;
-    detection.center = center;
-
-    // 旋转向量和平移向量
-    detection.rotationVector = rvecs[i].clone();
-    detection.translationVector = tvecs[i].clone();
-
-    // 转换为旋转矩阵
-    Rodrigues(detection.rotationVector, detection.rotationMatrix);
-
-    detection.isValid = true;
-    detections.push_back(detection);
-
-    cout << "  ├─ 标记 ID: " << detection.tagId << "\n";
-    cout << "  │  位置 (相机坐标系): (" << fixed << setprecision(3)
-         << detection.translationVector.at<double>(0, 0) * 1000 << ", "
-         << detection.translationVector.at<double>(1, 0) * 1000 << ", "
-         << detection.translationVector.at<double>(2, 0) * 1000 << ") mm\n";
   }
 
-  cout << "════════════════════════════════════════════════════════════\n\n";
+  // 清理资源
+  image_u8_destroy(img_u8);
+  apriltag_detections_destroy(detections_array);
+  apriltag_detector_destroy(td);
 
+  cout << "\n";
   return detections;
 }
 
@@ -526,7 +565,8 @@ int main(int argc, char* argv[]) {
   double tagSize = atof(argv[4]);
 
   string outputFile = "apriltag_result.yaml";
-  int dictId = cv::aruco::DICT_APRILTAG_36h11;
+  apriltag_family_t* tf = tagStandard41h12_create();  // 默认使用 tag41h12
+  std::cout << "[信息] 默认使用 tagStandard41h12 标签族\n\n";
   bool visualize = false;
 
   // 解析可选参数
@@ -538,12 +578,39 @@ int main(int argc, char* argv[]) {
       return 0;
     } else if (arg == "--tag-family" && i + 1 < argc) {
       string family = argv[++i];
-      if (family == "36h11") {
-        dictId = cv::aruco::DICT_APRILTAG_36h11;
+
+      // 销毁旧的标签族
+      if (tf != nullptr) {
+        tagStandard41h12_destroy(tf);
+      }
+
+      if (family == "16h5") {
+        tf = tag16h5_create();
+        cout << "[信息] 使用 tag16h5 标签族\n";
       } else if (family == "25h9") {
-        dictId = cv::aruco::DICT_APRILTAG_25h9;
-      } else if (family == "16h5") {
-        dictId = cv::aruco::DICT_APRILTAG_16h5;
+        tf = tag25h9_create();
+        cout << "[信息] 使用 tag25h9 标签族\n";
+      } else if (family == "36h10") {
+        tf = tag36h10_create();
+        cout << "[信息] 使用 tag36h10 标签族\n";
+      } else if (family == "36h11") {
+        tf = tag36h11_create();
+        cout << "[信息] 使用 tag36h11 标签族\n";
+      } else if (family == "circle21h7") {
+        tf = tagCircle21h7_create();
+        cout << "[信息] 使用 tagCircle21h7 标签族\n";
+      } else if (family == "circle49h12") {
+        tf = tagCircle49h12_create();
+        cout << "[信息] 使用 tagCircle49h12 标签族\n";
+      } else if (family == "custom48h12") {
+        tf = tagCustom48h12_create();
+        cout << "[信息] 使用 tagCustom48h12 标签族\n";
+      } else if (family == "41h12") {
+        tf = tagStandard41h12_create();
+        cout << "[信息] 使用 tagStandard41h12 标签族\n";
+      } else if (family == "52h13") {
+        tf = tagStandard52h13_create();
+        cout << "[信息] 使用 tagStandard52h13 标签族\n";
       } else {
         cerr << "[ERROR] 未知的标签族: " << family << endl;
         return -1;
@@ -556,7 +623,7 @@ int main(int argc, char* argv[]) {
   }
 
   cout << "\n╔════════════════════════════════════════════════════════════╗\n";
-  cout << "║       AprilTag 识别和位姿求解程序 v1.0                   ║\n";
+  cout << "║     AprilTag 识别和位姿求解程序 v2.0 (apriltag3)         ║\n";
   cout << "╚════════════════════════════════════════════════════════════╝\n\n";
 
   // ====================================================================
@@ -609,12 +676,14 @@ int main(int argc, char* argv[]) {
   // ====================================================================
   // 步骤 4: 检测 AprilTag
   // ====================================================================
-  vector<AprilTagDetection> detections =
-      detectAprilTags(image, tagSize, intrinsics.cameraMatrix,
-                      intrinsics.distortionCoeffs, dictId);
+  vector<AprilTagDetection> detections = detectAprilTags(
+      image, tagSize, intrinsics.cameraMatrix, intrinsics.distortionCoeffs, tf);
 
   if (detections.empty()) {
     cout << "[信息] 未检测到任何 AprilTag\n";
+    if (tf != nullptr) {
+      tagStandard41h12_destroy(tf);
+    }
     return 0;
   }
 
@@ -653,6 +722,11 @@ int main(int argc, char* argv[]) {
     visualizeDetections(image, detections, intrinsics.cameraMatrix,
                         intrinsics.distortionCoeffs);
     cout << "════════════════════════════════════════════════════════════\n\n";
+  }
+
+  // 清理资源
+  if (tf != nullptr) {
+    tagStandard41h12_destroy(tf);
   }
 
   cout << "[完成] AprilTag 识别和位姿求解完毕\n";

@@ -119,7 +119,7 @@ ls install/cam_intrinsic_calib/lib/cam_intrinsic_calib/
 
 ```bash
 ros2 run cam_intrinsic_calib camera_node --ros-args \
-  -p image_save_path:=./images \
+  -p image_save_path:=/home/zzh/cam_intrinsic_calib/apriltag_pic \
   -p capture_fps:=1 \
   -p enable_auto_exposure:=true
 ```

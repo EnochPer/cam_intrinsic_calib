@@ -9,8 +9,9 @@ find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED)  # 如果使用 OpenCV 处理图像，确保已找到 OpenCV
 
-# 设置海康 SDK 的 include 路径
+# 设置 AprilTag 和 海康 SDK 的 include 路径
 include_directories(
+  ${CMAKE_CURRENT_SOURCE_DIR}/include  # AprilTag 头文件和源文件
   /opt/MVS/include  # 这里替换为实际的海康 SDK 的路径
 )
 
@@ -60,11 +61,32 @@ target_link_libraries(extrinsic_calib
 )
 
 # 可执行文件5: apriltag_detector (AprilTag 检测和位姿求解工具)
+# 编译 AprilTag 源文件
+add_library(apriltag_lib STATIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/apriltag.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/apriltag_pose.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/apriltag_quad_thresh.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/tag16h5.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/tag25h9.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/tag36h10.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/tag36h11.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/tagCircle21h7.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/tagCircle49h12.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/tagCustom48h12.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/tagStandard41h12.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/tagStandard52h13.c
+)
+
+# 为 apriltag 库添加 include 目录
+target_include_directories(apriltag_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 add_executable(apriltag_detector src/apriltag_detector.cpp)
 
-# 为 apriltag_detector 链接 OpenCV (包括 ArUco 模块)
+# 为 apriltag_detector 链接 OpenCV 和 apriltag 库
 target_link_libraries(apriltag_detector
   ${OpenCV_LIBS}
+  apriltag_lib
+  m
 )
 
 # 安装可执行文件

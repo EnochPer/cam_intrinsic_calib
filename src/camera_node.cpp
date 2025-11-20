@@ -2,6 +2,8 @@
 
 #include <chrono>
 #include <ctime>
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <opencv2/opencv.hpp>
@@ -323,14 +325,47 @@ class CameraNode : public rclcpp::Node {
     if (!img.empty()) {
       // 如果指定了保存路径，保存图像到本地
       if (!node->image_save_path_.empty()) {
+        // 创建bmp和jpg子文件夹
+        std::string bmp_dir = node->image_save_path_ + "/bmp";
+        std::string jpg_dir = node->image_save_path_ + "/jpg";
+
+        try {
+          std::filesystem::create_directories(bmp_dir);
+          std::filesystem::create_directories(jpg_dir);
+        } catch (const std::filesystem::filesystem_error& e) {
+          RCLCPP_ERROR(node->get_logger(), "Failed to create directories: %s",
+                       e.what());
+        }
+
+        // 生成时间戳文件名
         auto now = std::chrono::system_clock::now();
         auto now_c = std::chrono::system_clock::to_time_t(now);
         std::tm now_tm = *std::localtime(&now_c);
-        std::ostringstream file_path;
-        file_path << node->image_save_path_ << "/"
-                  << std::put_time(&now_tm, "%Y%m%d_%H%M%S") << "_"
-                  << pstFrame->stFrameInfo.nFrameNum << ".jpg";
-        cv::imwrite(file_path.str(), img);
+        std::ostringstream filename_base;
+        filename_base << std::put_time(&now_tm, "%Y%m%d_%H%M%S") << "_"
+                      << pstFrame->stFrameInfo.nFrameNum;
+
+        // 保存原始.bmp格式文件（无损格式，保留原图质量）
+        std::ostringstream bmp_file_path;
+        bmp_file_path << bmp_dir << "/" << filename_base.str() << ".bmp";
+        if (cv::imwrite(bmp_file_path.str(), img)) {
+          RCLCPP_DEBUG(node->get_logger(), "BMP image saved: %s",
+                       bmp_file_path.str().c_str());
+        } else {
+          RCLCPP_ERROR(node->get_logger(), "Failed to save BMP image: %s",
+                       bmp_file_path.str().c_str());
+        }
+
+        // 保存高品质jpg文件
+        std::ostringstream jpg_file_path;
+        jpg_file_path << jpg_dir << "/" << filename_base.str() << ".jpg";
+        if (cv::imwrite(jpg_file_path.str(), img)) {
+          RCLCPP_DEBUG(node->get_logger(), "JPG image saved: %s",
+                       jpg_file_path.str().c_str());
+        } else {
+          RCLCPP_ERROR(node->get_logger(), "Failed to save JPG image: %s",
+                       jpg_file_path.str().c_str());
+        }
       }
 
       // Fill header and publish
