@@ -119,7 +119,7 @@ ls install/cam_intrinsic_calib/lib/cam_intrinsic_calib/
 
 ```bash
 ros2 run cam_intrinsic_calib camera_node --ros-args \
-  -p image_save_path:=/home/zzh/cam_intrinsic_calib/apriltag_pic \
+  -p image_save_path:=/home/zzh/cam_intrinsic_calib/cam_data1120 \
   -p capture_fps:=1 \
   -p enable_auto_exposure:=true
 ```
@@ -207,11 +207,10 @@ python3 analyze_calibration.py camera_calib.yaml \
 
 ```bash
 ./install/cam_intrinsic_calib/lib/cam_intrinsic_calib/apriltag_detector \
-  image.jpg \
+  /home/zzh/cam_intrinsic_calib/apriltag_pic/jpg/20251120_143432_69.jpg \
   camera_calib.yaml \
-  extrinsic.yaml \
-  0.15 \
-  --tag-family 36h11 \
+  extrinsic1.yaml \
+  0.1 \
   --visualize \
   --output result.yaml
 ```
@@ -221,7 +220,7 @@ python3 analyze_calibration.py camera_calib.yaml \
 - `<intrinsic>`：（必需）内参 YAML 文件
 - `<extrinsic>`：（必需）外参 YAML 文件
 - `<tag_size>`：（必需）标签尺寸（米，如 15cm = 0.15）
-- `--tag-family <f>`：标签族，36h11（推荐）/25h9/16h5，默认 36h11
+- `--tag-family <f>`：标签族，41h12（推荐）/25h9/16h5
 - `--visualize`：显示识别结果和坐标轴（可选）
 - `--output <file>`：输出 YAML 文件，默认 apriltag_result.yaml
 

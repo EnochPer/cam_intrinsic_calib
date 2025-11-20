@@ -13,6 +13,8 @@
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>cv_bridge</depend>
+  <depend>rosbag2_cpp</depend>
+  <depend>rosbag2_storage</depend>
 
   <!-- 添加 OpenCV 作为依赖 -->
   <depend>opencv</depend>

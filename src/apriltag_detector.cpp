@@ -40,19 +40,19 @@
 #include <string>
 #include <vector>
 
-// AprilTag 库头文件
+// AprilTag 库头文件（从系统安装的 apriltag 项目中获取）
 extern "C" {
-#include "apriltag.h"
-#include "apriltag_pose.h"
-#include "tag16h5.h"
-#include "tag25h9.h"
-#include "tag36h10.h"
-#include "tag36h11.h"
-#include "tagCircle21h7.h"
-#include "tagCircle49h12.h"
-#include "tagCustom48h12.h"
-#include "tagStandard41h12.h"
-#include "tagStandard52h13.h"
+#include <apriltag/apriltag.h>
+#include <apriltag/apriltag_pose.h>
+#include <apriltag/tag16h5.h>
+#include <apriltag/tag25h9.h>
+#include <apriltag/tag36h10.h>
+#include <apriltag/tag36h11.h>
+#include <apriltag/tagCircle21h7.h>
+#include <apriltag/tagCircle49h12.h>
+#include <apriltag/tagCustom48h12.h>
+#include <apriltag/tagStandard41h12.h>
+#include <apriltag/tagStandard52h13.h>
 }
 
 using namespace cv;
@@ -295,20 +295,21 @@ vector<AprilTagDetection> detectAprilTags(const Mat& image, double tagSize,
 
       // 估计位姿
       info.det = det;
-      apriltag_pose_t pose = estimate_tag_pose(&info);
+      apriltag_pose_t pose;
+      estimate_tag_pose(&info, &pose);
 
       // 转换位姿到 OpenCV 格式
-      // pose.R 是 3×3 旋转矩阵，pose.t 是 3×1 平移向量
+      // pose.R 是 matd_t（3×3 矩阵），pose.t 是 matd_t（3×1 向量）
       detection.rotationMatrix = Mat(3, 3, CV_64F);
       for (int r = 0; r < 3; ++r) {
         for (int c = 0; c < 3; ++c) {
-          detection.rotationMatrix.at<double>(r, c) = pose.R->data[r][c];
+          detection.rotationMatrix.at<double>(r, c) = MATD_EL(pose.R, r, c);
         }
       }
 
       detection.translationVector = Mat(3, 1, CV_64F);
       for (int r = 0; r < 3; ++r) {
-        detection.translationVector.at<double>(r, 0) = pose.t->data[r];
+        detection.translationVector.at<double>(r, 0) = MATD_EL(pose.t, r, 0);
       }
 
       // 转换为旋转向量
@@ -345,12 +346,13 @@ vector<AprilTagDetection> detectAprilTags(const Mat& image, double tagSize,
  * @return 世界坐标系中的位姿
  *
  * 变换关系：
- *   T_world_tag = T_world_camera * T_camera_tag
+ *   P_world = R_c2w * P_camera + t_c2w
  *
  *   其中：
- *   - T_world_tag: 标签在世界坐标系中的位姿
- *   - T_world_camera: 相机在世界坐标系中的位姿（由外参给出）
- *   - T_camera_tag: 标签在相机坐标系中的位姿
+ *   - P_world: 点在世界坐标系中的坐标
+ *   - R_c2w: 相机坐标系到世界坐标系的旋转矩阵
+ *   - P_camera: 点在相机坐标系中的坐标
+ *   - t_c2w: 相机坐标系原点在世界坐标系中的位置
  */
 AprilTagWorldPose transformToWorldCoordinates(
     const AprilTagDetection& cameraDetection,
@@ -358,26 +360,26 @@ AprilTagWorldPose transformToWorldCoordinates(
   AprilTagWorldPose worldPose;
   worldPose.tagId = cameraDetection.tagId;
 
-  // 标签在相机坐标系中的位姿（单位转换为 mm）
-  Mat tag_R_cam = cameraDetection.rotationMatrix.t();  // 相机→标签的反向旋转
-  Mat tag_t_cam =
-      cameraDetection.translationVector.clone() * 1000;  // 转换为 mm
-  tag_t_cam = -tag_R_cam * tag_t_cam;                    // 反向平移
+  // 获取相机到世界的变换
+  // 外参给定的是世界到相机的变换 (R_w2c, t_w2c)
+  Mat R_w2c = cameraExtrinsics.rotationMatrix;     // 世界→相机 旋转
+  Mat t_w2c = cameraExtrinsics.translationVector;  // 世界→相机 平移 (mm)
 
-  // 世界到相机的变换矩阵
-  // T_w2c = [R_w2c | t_w2c]
-  Mat R_w2c = cameraExtrinsics.rotationMatrix;     // 世界→相机
-  Mat t_w2c = cameraExtrinsics.translationVector;  // 世界→相机的平移
+  // 反向计算得到相机到世界的变换
+  // R_c2w = R_w2c^T (旋转矩阵的逆等于转置)
+  // t_c2w = -R_c2w * t_w2c
+  Mat R_c2w = R_w2c.t();
+  Mat t_c2w = -R_c2w * t_w2c;
 
-  // 计算相机到世界的变换（反向）
-  // T_c2w = [R_c2w | t_c2w]
-  Mat R_c2w = R_w2c.t();       // 相机→世界
-  Mat t_c2w = -R_c2w * t_w2c;  // 相机→世界的平移
+  // 标签在相机坐标系中的位姿
+  Mat R_cam2tag = cameraDetection.rotationMatrix;  // 相机→标签 旋转
+  Mat t_cam2tag = cameraDetection.translationVector.clone() * 1000;  // 相机→标签 平移 (转换为 mm)
 
-  // 世界到标签的变换 = 相机到世界的变换 * 相机到标签的变换
-  // T_w2tag = T_c2w * T_c2tag
-  worldPose.rotationMatrix = R_c2w * tag_R_cam;
-  worldPose.translationVector = R_c2w * tag_t_cam + t_c2w;
+  // 标签在世界坐标系中的旋转：R_world2tag = R_c2w * R_cam2tag
+  worldPose.rotationMatrix = R_c2w * R_cam2tag;
+
+  // 标签在世界坐标系中的平移：t_world2tag = R_c2w * t_cam2tag + t_c2w
+  worldPose.translationVector = R_c2w * t_cam2tag + t_c2w;
 
   // 转换为旋转向量
   Rodrigues(worldPose.rotationMatrix, worldPose.rotationVector);
@@ -496,21 +498,41 @@ void visualizeDetections(const Mat& image,
                          const Mat& cameraMatrix, const Mat& distCoeffs) {
   Mat display = image.clone();
 
+  // 缩小1倍（尺寸减半）
+  Mat displayResized;
+  resize(display, displayResized, Size(display.cols / 2, display.rows / 2));
+
+  // 调整检测结果中的坐标和相机矩阵（缩放因子为 0.5）
+  float scale = 0.5f;
+  Mat cameraMatrixScaled = cameraMatrix.clone();
+  cameraMatrixScaled.at<double>(0, 0) *= scale;  // fx
+  cameraMatrixScaled.at<double>(1, 1) *= scale;  // fy
+  cameraMatrixScaled.at<double>(0, 2) *= scale;  // cx
+  cameraMatrixScaled.at<double>(1, 2) *= scale;  // cy
+
   for (const auto& detection : detections) {
+    // 缩放检测结果中的2D坐标
+    vector<Point2f> scaledCorners;
+    for (const auto& corner : detection.corners) {
+      scaledCorners.push_back(Point2f(corner.x * scale, corner.y * scale));
+    }
+
+    Point2f scaledCenter(detection.center.x * scale, detection.center.y * scale);
+
     // 绘制标记的边界
-    for (size_t i = 0; i < detection.corners.size(); ++i) {
-      Point p1 = detection.corners[i];
-      Point p2 = detection.corners[(i + 1) % detection.corners.size()];
-      line(display, p1, p2, Scalar(0, 255, 0), 3);
+    for (size_t i = 0; i < scaledCorners.size(); ++i) {
+      Point p1 = scaledCorners[i];
+      Point p2 = scaledCorners[(i + 1) % scaledCorners.size()];
+      line(displayResized, p1, p2, Scalar(0, 255, 0), 2);
     }
 
     // 绘制中心点
-    circle(display, detection.center, 5, Scalar(0, 0, 255), -1);
+    circle(displayResized, scaledCenter, 3, Scalar(0, 0, 255), -1);
 
     // 绘制标签 ID
-    putText(display, "ID: " + to_string(detection.tagId),
-            Point(detection.center.x - 30, detection.center.y - 20),
-            FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0, 255, 0), 2);
+    putText(displayResized, "ID: " + to_string(detection.tagId),
+            Point(scaledCenter.x - 20, scaledCenter.y - 15),
+            FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 255, 0), 1);
 
     // 绘制坐标系轴
     vector<Point3f> axisPoints;
@@ -521,28 +543,29 @@ void visualizeDetections(const Mat& image,
 
     vector<Point2f> projectedPoints;
     projectPoints(axisPoints, detection.rotationVector,
-                  detection.translationVector, cameraMatrix, distCoeffs,
+                  detection.translationVector, cameraMatrixScaled, distCoeffs,
                   projectedPoints);
 
     // X 轴 - 红
-    line(display, projectedPoints[0], projectedPoints[1], Scalar(0, 0, 255), 2);
-    putText(display, "X", projectedPoints[1], FONT_HERSHEY_SIMPLEX, 0.5,
-            Scalar(0, 0, 255), 2);
+    line(displayResized, projectedPoints[0], projectedPoints[1], Scalar(0, 0, 255), 2);
+    putText(displayResized, "X", projectedPoints[1], FONT_HERSHEY_SIMPLEX, 0.4,
+            Scalar(0, 0, 255), 1);
 
     // Y 轴 - 绿
-    line(display, projectedPoints[0], projectedPoints[2], Scalar(0, 255, 0), 2);
-    putText(display, "Y", projectedPoints[2], FONT_HERSHEY_SIMPLEX, 0.5,
-            Scalar(0, 255, 0), 2);
+    line(displayResized, projectedPoints[0], projectedPoints[2], Scalar(0, 255, 0), 2);
+    putText(displayResized, "Y", projectedPoints[2], FONT_HERSHEY_SIMPLEX, 0.4,
+            Scalar(0, 255, 0), 1);
 
     // Z 轴 - 蓝
-    line(display, projectedPoints[0], projectedPoints[3], Scalar(255, 0, 0), 2);
-    putText(display, "Z", projectedPoints[3], FONT_HERSHEY_SIMPLEX, 0.5,
-            Scalar(255, 0, 0), 2);
+    line(displayResized, projectedPoints[0], projectedPoints[3], Scalar(255, 0, 0), 2);
+    putText(displayResized, "Z", projectedPoints[3], FONT_HERSHEY_SIMPLEX, 0.4,
+            Scalar(255, 0, 0), 1);
   }
 
-  // 显示图像
-  namedWindow("AprilTag Detection", WINDOW_NORMAL);
-  imshow("AprilTag Detection", display);
+  // 显示图像（带可移动窗口）
+  namedWindow("AprilTag Detection", WINDOW_NORMAL | WINDOW_KEEPRATIO);
+  moveWindow("AprilTag Detection", 100, 100);  // 移动窗口到 (100, 100) 位置
+  imshow("AprilTag Detection", displayResized);
 
   cout << "[信息] 显示识别结果 (按任意键关闭)\n\n";
   waitKey(0);
@@ -564,7 +587,17 @@ int main(int argc, char* argv[]) {
   string extrinsicFile = argv[3];
   double tagSize = atof(argv[4]);
 
-  string outputFile = "apriltag_result.yaml";
+  // 从输入图像路径生成输出文件名
+  // 提取图像文件名（不含路径和扩展名）
+  size_t lastSlash = imageFile.find_last_of("/\\");
+  string imageDir = (lastSlash != string::npos) ? imageFile.substr(0, lastSlash) : ".";
+  string imageFilename = (lastSlash != string::npos) ? imageFile.substr(lastSlash + 1) : imageFile;
+  size_t lastDot = imageFilename.find_last_of(".");
+  string imageBasename = (lastDot != string::npos) ? imageFilename.substr(0, lastDot) : imageFilename;
+
+  // 生成输出文件名：result_[图像名].yaml，保存在图像所在目录
+  string outputFile = imageDir + "/result_" + imageBasename + ".yaml";
+
   apriltag_family_t* tf = tagStandard41h12_create();  // 默认使用 tag41h12
   std::cout << "[信息] 默认使用 tagStandard41h12 标签族\n\n";
   bool visualize = false;

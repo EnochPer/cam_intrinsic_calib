@@ -6,13 +6,20 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <opencv2/opencv.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sstream>
 #include <std_msgs/msg/header.hpp>
+#include <string>
+#include <utility>
 
 #include "MvCameraControl.h"
+#include "rclcpp/serialization.hpp"
+#include "rcpputils/filesystem_helper.hpp"
+#include "rosbag2_cpp/storage_options.hpp"
+#include "rosbag2_cpp/writer.hpp"
 
 class CameraNode : public rclcpp::Node {
  public:
@@ -20,11 +27,18 @@ class CameraNode : public rclcpp::Node {
     // 声明参数
     this->declare_parameter<std::string>("image_save_path",
                                          "/home/zzh/Pictures/hik");
-    this->declare_parameter<int>("capture_fps", 3);
+    this->declare_parameter<int>("capture_fps", 30);  // 默认30fps
 
     // 获取参数值
     image_save_path_ = this->get_parameter("image_save_path").as_string();
     capture_fps_ = this->get_parameter("capture_fps").as_int();
+
+    // 限制帧率只能是30或60fps
+    if (capture_fps_ != 30 && capture_fps_ != 60) {
+      RCLCPP_WARN(this->get_logger(), "Invalid fps %d, using default 30fps",
+                  capture_fps_);
+      capture_fps_ = 30;
+    }
 
     // 计算帧间隔（毫秒）
     frame_interval_ms_ = (capture_fps_ > 0) ? (1000 / capture_fps_) : 0;
@@ -40,6 +54,9 @@ class CameraNode : public rclcpp::Node {
     publisher_ =
         this->create_publisher<sensor_msgs::msg::Image>("camera/image_raw", 10);
 
+    // 初始化rosbag
+    initializeRosbag();
+
     // 初始化海康相机
     initializeCamera();
 
@@ -51,6 +68,10 @@ class CameraNode : public rclcpp::Node {
     // 停止图像采集
     std::cout << "start stop grab" << std::endl;
     stopGrabbing();
+
+    // 关闭rosbag
+    closeRosbag();
+    std::cout << "close rosbag" << std::endl;
 
     // 关闭相机
     closeCamera();
@@ -78,18 +99,82 @@ class CameraNode : public rclcpp::Node {
     }
 
     MV_CC_CreateHandle(&handle_, stDeviceList.pDeviceInfo[0]);
-    // Open device with exclusive access (matches SimpleCapture example)
+
+    // 尝试打开相机，先使用独占模式
     nRet = MV_CC_OpenDevice(handle_, MV_ACCESS_Exclusive, 0);
+
+    // 如果打开失败，可能是相机已被占用或其他原因
     if (nRet != MV_OK) {
-      RCLCPP_ERROR(this->get_logger(), "Failed to open camera.");
-      return;
+      // 输出错误码并尝试再次打开（不切换模式）
+      RCLCPP_WARN(this->get_logger(),
+                  "Failed to open camera: 0x%x. Retrying...", nRet);
+
+      // 尝试再次打开（最多3次重试）
+      int retry_count = 0;
+      const int max_retries = 3;
+      while (nRet != MV_OK && retry_count < max_retries) {
+        retry_count++;
+        RCLCPP_WARN(this->get_logger(), "Retrying to open camera (%d/%d)...",
+                    retry_count, max_retries);
+        nRet = MV_CC_OpenDevice(handle_, MV_ACCESS_Exclusive, 0);
+      }
+
+      if (nRet != MV_OK) {
+        RCLCPP_ERROR(this->get_logger(),
+                     "Failed to open camera after %d retries.", max_retries);
+        return;
+      }
     }
+
+    RCLCPP_INFO(this->get_logger(), "Camera opened successfully.");
 
     nRet =
         MV_CC_SetEnumValue(handle_, "TriggerMode", 0);  // Set trigger mode off
     if (nRet != MV_OK) {
       RCLCPP_ERROR(this->get_logger(), "Failed to set trigger mode.");
       return;
+    }
+
+    // ========================================================================
+    // 设置帧率
+    // ========================================================================
+    MVCC_FLOATVALUE stFrameRateValue = {0};
+    nRet =
+        MV_CC_GetFloatValue(handle_, "AcquisitionFrameRate", &stFrameRateValue);
+    if (nRet == MV_OK) {
+      RCLCPP_INFO(this->get_logger(),
+                  "Current FrameRate: %.2f Hz, Range: [%.2f, %.2f] Hz",
+                  stFrameRateValue.fCurValue, stFrameRateValue.fMin,
+                  stFrameRateValue.fMax);
+
+      // 设置帧率为30或60fps
+      float target_frame_rate = static_cast<float>(capture_fps_);
+
+      // 确保目标帧率在有效范围内
+      if (target_frame_rate < stFrameRateValue.fMin) {
+        target_frame_rate = stFrameRateValue.fMin;
+        RCLCPP_WARN(this->get_logger(),
+                    "Target frame rate %.2f Hz is below minimum, using %.2f Hz",
+                    static_cast<float>(capture_fps_), target_frame_rate);
+      }
+
+      if (target_frame_rate > stFrameRateValue.fMax) {
+        target_frame_rate = stFrameRateValue.fMax;
+        RCLCPP_WARN(this->get_logger(),
+                    "Target frame rate %.2f Hz is above maximum, using %.2f Hz",
+                    static_cast<float>(capture_fps_), target_frame_rate);
+      }
+
+      // 设置帧率
+      nRet = MV_CC_SetFloatValue(handle_, "AcquisitionFrameRate",
+                                 target_frame_rate);
+      if (nRet == MV_OK) {
+        RCLCPP_INFO(this->get_logger(), "AcquisitionFrameRate set to: %.2f Hz",
+                    target_frame_rate);
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "Failed to set frame rate: 0x%x",
+                     nRet);
+      }
     }
 
     // ========================================================================
@@ -102,8 +187,8 @@ class CameraNode : public rclcpp::Node {
                   "Current Gain: %.2f dB, Range: [%.2f, %.2f] dB",
                   stGainValue.fCurValue, stGainValue.fMin, stGainValue.fMax);
 
-      // 计算目标增益：当前增益 + 增量
-      float targetGain = stGainValue.fCurValue - 5.0;
+      // 计算目标增益：增加增益以提高图像亮度
+      float targetGain = stGainValue.fCurValue + 5.0;  // 增加5dB增益
 
       // 确保目标增益在有效范围内
       if (targetGain > stGainValue.fMax) {
@@ -111,13 +196,13 @@ class CameraNode : public rclcpp::Node {
         RCLCPP_WARN(
             this->get_logger(),
             "Target gain (%.2f dB) exceeds maximum. Clamping to %.2f dB",
-            stGainValue.fCurValue, targetGain);
+            targetGain, stGainValue.fMax);
       }
 
       nRet = MV_CC_SetFloatValue(handle_, "Gain", targetGain);
       if (nRet == MV_OK) {
         RCLCPP_INFO(this->get_logger(),
-                    "Gain set to: %.2f dB (increased by 10 dB from baseline)",
+                    "Gain set to: %.2f dB (increased by 5 dB from baseline)",
                     targetGain);
       } else {
         RCLCPP_ERROR(this->get_logger(), "Failed to set gain: 0x%x", nRet);
@@ -141,17 +226,7 @@ class CameraNode : public rclcpp::Node {
           "Failed to disable auto exposure: 0x%x (may not be available)", nRet);
     }
 
-    // Step 2: 设置曝光模式为手动（如果支持）
-    // nRet = MV_CC_SetEnumValue(handle_, "ExposureMode", 0);  // 0 = Manual
-    // if (nRet == MV_OK) {
-    //   RCLCPP_INFO(this->get_logger(), "Exposure mode set to Manual");
-    // } else {
-    //   RCLCPP_WARN(this->get_logger(),
-    //               "Failed to set exposure mode: 0x%x (may not be available)",
-    //               nRet);
-    // }
-
-    // Step 3: 查询曝光时间范围
+    // Step 2: 查询曝光时间范围
     MVCC_FLOATVALUE stExposureTime = {0};
     nRet = MV_CC_GetFloatValue(handle_, "ExposureTime", &stExposureTime);
     if (nRet == MV_OK) {
@@ -164,29 +239,24 @@ class CameraNode : public rclcpp::Node {
                   "Failed to query exposure time parameter: 0x%x", nRet);
     }
 
-    // Step 4: 查询帧率范围
-    MVCC_FLOATVALUE stFrameRateValue = {0};
+    // Step 3: 查询帧率范围
+    stFrameRateValue = {0};
     nRet =
         MV_CC_GetFloatValue(handle_, "AcquisitionFrameRate", &stFrameRateValue);
     if (nRet != MV_OK) {
       RCLCPP_WARN(this->get_logger(),
                   "Failed to query frame rate parameter: 0x%x", nRet);
-    } else {
-      RCLCPP_INFO(this->get_logger(),
-                  "Current FrameRate: %.2f Hz, Range: [%.2f, %.2f] Hz",
-                  stFrameRateValue.fCurValue, stFrameRateValue.fMin,
-                  stFrameRateValue.fMax);
     }
 
-    // Step 5: 先设置合理的曝光时间（在当前帧率的约束下）
+    // Step 4: 先设置合理的曝光时间（在当前帧率的约束下）
     if (nRet == MV_OK && stExposureTime.fMin > 0) {
-      // 使用当前帧率或默认帧率计算合理的曝光时间
+      // 使用当前帧率计算最大可能的曝光时间
       float currentFrameRate =
           stFrameRateValue.fCurValue > 0 ? stFrameRateValue.fCurValue : 30.0f;
       float frameIntervalUs = 1000000.0f / currentFrameRate;
 
-      // 曝光时间为帧间隔的 80%（留出较多裕度）
-      float targetExposureTime = frameIntervalUs * 0.8f;
+      // 曝光时间为帧间隔的 90%（留出一些裕度）
+      float targetExposureTime = frameIntervalUs * 0.9f;
 
       // 确保在有效范围内
       if (targetExposureTime < stExposureTime.fMin) {
@@ -212,20 +282,6 @@ class CameraNode : public rclcpp::Node {
             "  Hint: Check if ExposureAuto or ExposureMode needs adjustment",
             nRet);
         // 不中断初始化流程，继续尝试后续参数设置
-      }
-    }
-
-    // Step 6: 然后设置为最大帧率
-    if (nRet == MV_OK && stFrameRateValue.fMax > 0) {
-      float maxFrameRate = stFrameRateValue.fMax;
-      nRet = MV_CC_SetFloatValue(handle_, "AcquisitionFrameRate", maxFrameRate);
-      if (nRet == MV_OK) {
-        RCLCPP_INFO(this->get_logger(),
-                    "AcquisitionFrameRate set to maximum: %.2f Hz",
-                    maxFrameRate);
-      } else {
-        RCLCPP_WARN(this->get_logger(),
-                    "Failed to set maximum frame rate: 0x%x", nRet);
       }
     }
 
@@ -269,20 +325,20 @@ class CameraNode : public rclcpp::Node {
       return;
     }
 
-    // 帧率控制：检查是否应该处理此帧
-    if (node->frame_interval_ms_ > 0) {
-      auto now = std::chrono::system_clock::now();
-      auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            now - node->last_frame_time_)
-                            .count();
-      if (elapsed_ms < node->frame_interval_ms_) {
-        // 帧间隔未达，释放缓冲后返回
-        if (!bAutoFree) {
-          MV_CC_FreeImageBuffer(node->handle_, pstFrame);
-        }
-        return;
-      }
-      node->last_frame_time_ = now;
+    // 记录回调被调用的次数和时间（用于调试帧率问题）
+    static int frame_count = 0;
+    static auto start_time = std::chrono::system_clock::now();
+
+    frame_count++;
+    auto now = std::chrono::system_clock::now();
+    auto elapsed =
+        std::chrono::duration_cast<std::chrono::seconds>(now - start_time)
+            .count();
+
+    if (elapsed >= 1.0) {  // 每1秒打印一次帧率
+      RCLCPP_INFO(node->get_logger(), "Callback FPS: %d", frame_count);
+      frame_count = 0;
+      start_time = now;
     }
 
     // Prepare output buffer for conversion (estimate)
@@ -322,60 +378,32 @@ class CameraNode : public rclcpp::Node {
         stSaveParam.pImageBuffer,
         stSaveParam.pImageBuffer + stSaveParam.nImageLen);
     cv::Mat img = cv::imdecode(imgBuf, cv::IMREAD_COLOR);
-    if (!img.empty()) {
-      // 如果指定了保存路径，保存图像到本地
-      if (!node->image_save_path_.empty()) {
-        // 创建bmp和jpg子文件夹
-        std::string bmp_dir = node->image_save_path_ + "/bmp";
-        std::string jpg_dir = node->image_save_path_ + "/jpg";
 
+    // 释放SDK转换后的数据
+    delete[] pOutputBuffer;
+
+    if (!img.empty()) {
+      // 保存到rosbag（优先处理rosbag，减少延迟）
+      if (node->rosbag_writer_ && node->serializer_) {
         try {
-          std::filesystem::create_directories(bmp_dir);
-          std::filesystem::create_directories(jpg_dir);
-        } catch (const std::filesystem::filesystem_error& e) {
-          RCLCPP_ERROR(node->get_logger(), "Failed to create directories: %s",
+          // 直接使用转换后的图像数据，不使用中间消息
+          auto cv_msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", img)
+                            .toImageMsg();
+          cv_msg->header.stamp = node->get_clock()->now();
+          cv_msg->header.frame_id = "camera_frame";
+
+          // 保存到rosbag
+          node->rosbag_writer_->write(*cv_msg, "camera/image_raw",
+                                      node->get_clock()->now());
+
+          // 发布图像消息
+          node->publisher_->publish(*cv_msg);
+        } catch (const std::exception& e) {
+          RCLCPP_ERROR(node->get_logger(), "Failed to write to rosbag: %s",
                        e.what());
         }
-
-        // 生成时间戳文件名
-        auto now = std::chrono::system_clock::now();
-        auto now_c = std::chrono::system_clock::to_time_t(now);
-        std::tm now_tm = *std::localtime(&now_c);
-        std::ostringstream filename_base;
-        filename_base << std::put_time(&now_tm, "%Y%m%d_%H%M%S") << "_"
-                      << pstFrame->stFrameInfo.nFrameNum;
-
-        // 保存原始.bmp格式文件（无损格式，保留原图质量）
-        std::ostringstream bmp_file_path;
-        bmp_file_path << bmp_dir << "/" << filename_base.str() << ".bmp";
-        if (cv::imwrite(bmp_file_path.str(), img)) {
-          RCLCPP_DEBUG(node->get_logger(), "BMP image saved: %s",
-                       bmp_file_path.str().c_str());
-        } else {
-          RCLCPP_ERROR(node->get_logger(), "Failed to save BMP image: %s",
-                       bmp_file_path.str().c_str());
-        }
-
-        // 保存高品质jpg文件
-        std::ostringstream jpg_file_path;
-        jpg_file_path << jpg_dir << "/" << filename_base.str() << ".jpg";
-        if (cv::imwrite(jpg_file_path.str(), img)) {
-          RCLCPP_DEBUG(node->get_logger(), "JPG image saved: %s",
-                       jpg_file_path.str().c_str());
-        } else {
-          RCLCPP_ERROR(node->get_logger(), "Failed to save JPG image: %s",
-                       jpg_file_path.str().c_str());
-        }
       }
-
-      // Fill header and publish
-      auto cv_msg =
-          cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", img).toImageMsg();
-      cv_msg->header.stamp = node->get_clock()->now();
-      node->publisher_->publish(*cv_msg);
     }
-
-    delete[] pOutputBuffer;
 
     if (!bAutoFree) {
       // If SDK did not auto free, free using device handle
@@ -383,8 +411,76 @@ class CameraNode : public rclcpp::Node {
     }
   }
 
+  // Rosbag related functions
+  void initializeRosbag() {
+    // 创建rosbag目录
+    std::string rosbag_dir = image_save_path_ + "/rosbag";
+
+    try {
+      std::filesystem::create_directories(rosbag_dir);
+    } catch (const std::filesystem::filesystem_error& e) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to create rosbag directory: %s",
+                   e.what());
+      return;
+    }
+
+    // 生成rosbag文件名（当前时间）
+    auto now = std::chrono::system_clock::now();
+    auto now_c = std::chrono::system_clock::to_time_t(now);
+    std::tm now_tm = *std::localtime(&now_c);
+    std::ostringstream bag_filename;
+    bag_filename << std::put_time(&now_tm, "%Y%m%d_%H%M%S") << ".db3";
+
+    std::string bag_file_path = rosbag_dir + "/" + bag_filename.str();
+
+    RCLCPP_INFO(this->get_logger(), "Rosbag will be saved to: %s",
+                bag_file_path.c_str());
+
+    // 初始化rosbag writer
+    try {
+      rosbag_writer_ = std::make_unique<rosbag2_cpp::Writer>();
+
+      // 存储选项
+      rosbag2_cpp::StorageOptions storage_options;
+      storage_options.uri = bag_file_path;
+      storage_options.storage_id = "sqlite3";
+
+      // 配置选项
+      rosbag2_cpp::ConverterOptions converter_options;
+
+      // 打开rosbag
+      rosbag_writer_->open(storage_options, converter_options);
+
+      // 创建序列化器
+      serializer_ =
+          std::make_unique<rclcpp::Serialization<sensor_msgs::msg::Image>>();
+
+      RCLCPP_INFO(this->get_logger(), "Rosbag initialized successfully");
+    } catch (const std::exception& e) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to initialize rosbag: %s",
+                   e.what());
+      return;
+    }
+  }
+
+  void closeRosbag() {
+    if (rosbag_writer_) {
+      try {
+        rosbag_writer_->close();
+        RCLCPP_INFO(this->get_logger(), "Rosbag closed successfully");
+      } catch (const std::exception& e) {
+        RCLCPP_ERROR(this->get_logger(), "Failed to close rosbag: %s",
+                     e.what());
+      }
+    }
+  }
+
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr publisher_;
   void* handle_ = nullptr;
+
+  // Rosbag related members
+  std::unique_ptr<rosbag2_cpp::Writer> rosbag_writer_;
+  std::unique_ptr<rclcpp::Serialization<sensor_msgs::msg::Image>> serializer_;
 
   // 参数成员
   std::string image_save_path_;
