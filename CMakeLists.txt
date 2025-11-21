@@ -20,23 +20,14 @@ link_directories(
   /opt/MVS/lib  # 替换为实际的路径
 )
 
-# 可执行文件1: camera_node (ROS2 节点)
+# 可执行文件1: camera_node (独立相机节点)
 add_executable(camera_node src/camera_node.cpp)
 
-# 添加依赖的库
+# 为 camera_node 链接 OpenCV 和海康库
 target_link_libraries(camera_node
+  ${OpenCV_LIBS}
   /opt/MVS/lib/64/libMvCameraControl.so  # 根据实际路径链接海康的库文件
 )
-
-# 将 target 与依赖项关联
-ament_target_dependencies(camera_node
-  rclcpp
-  sensor_msgs
-  cv_bridge
-  OpenCV  # 如果使用 OpenCV 处理图像，添加 OpenCV 依赖
-  rosbag2_cpp  # 添加 rosbag2_cpp 依赖
-)
-
 # 可执行文件2: calibrate_camera (独立标定工具)
 add_executable(calibrate_camera src/calibrate_camera.cpp)
 
@@ -74,8 +65,24 @@ target_link_libraries(apriltag_detector
   m
 )
 
+# 可执行文件6: record_video (视频录制工具)
+add_executable(record_video src/record_video.cpp)
+
+# 添加依赖的库
+target_link_libraries(record_video
+  /opt/MVS/lib/64/libMvCameraControl.so  # 根据实际路径链接海康的库文件
+)
+
+# 将 target 与依赖项关联
+ament_target_dependencies(record_video
+  rclcpp
+  sensor_msgs
+  cv_bridge
+  OpenCV
+)
+
 # 安装可执行文件
-install(TARGETS camera_node calibrate_camera undistort_camera extrinsic_calib apriltag_detector
+install(TARGETS camera_node calibrate_camera undistort_camera extrinsic_calib apriltag_detector record_video
   RUNTIME DESTINATION lib/${PROJECT_NAME}  # 可执行文件安装到 lib/${PROJECT_NAME} 目录
 )
 

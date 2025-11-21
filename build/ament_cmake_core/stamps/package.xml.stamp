@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>cam_intrinsic_calib</name>
+  <version>0.0.0</version>
+  <description>ROS 2 Camera Intrinsic Calibration Node</description>
+  <maintainer email="zzh@todo.todo">zzh</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- 依赖项 -->
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>rosbag2_cpp</depend>
+  <depend>rosbag2_storage</depend>
+
+  <!-- 添加 OpenCV 作为依赖 -->
+  <depend>opencv</depend>
+
+  <!-- 添加海康 SDK 库的依赖 -->
+  <exec_depend>libMvCameraControl.so</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

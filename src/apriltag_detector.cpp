@@ -373,7 +373,8 @@ AprilTagWorldPose transformToWorldCoordinates(
 
   // 标签在相机坐标系中的位姿
   Mat R_cam2tag = cameraDetection.rotationMatrix;  // 相机→标签 旋转
-  Mat t_cam2tag = cameraDetection.translationVector.clone() * 1000;  // 相机→标签 平移 (转换为 mm)
+  Mat t_cam2tag = cameraDetection.translationVector.clone() *
+                  1000;  // 相机→标签 平移 (转换为 mm)
 
   // 标签在世界坐标系中的旋转：R_world2tag = R_c2w * R_cam2tag
   worldPose.rotationMatrix = R_c2w * R_cam2tag;
@@ -517,7 +518,8 @@ void visualizeDetections(const Mat& image,
       scaledCorners.push_back(Point2f(corner.x * scale, corner.y * scale));
     }
 
-    Point2f scaledCenter(detection.center.x * scale, detection.center.y * scale);
+    Point2f scaledCenter(detection.center.x * scale,
+                         detection.center.y * scale);
 
     // 绘制标记的边界
     for (size_t i = 0; i < scaledCorners.size(); ++i) {
@@ -547,17 +549,20 @@ void visualizeDetections(const Mat& image,
                   projectedPoints);
 
     // X 轴 - 红
-    line(displayResized, projectedPoints[0], projectedPoints[1], Scalar(0, 0, 255), 2);
+    line(displayResized, projectedPoints[0], projectedPoints[1],
+         Scalar(0, 0, 255), 2);
     putText(displayResized, "X", projectedPoints[1], FONT_HERSHEY_SIMPLEX, 0.4,
             Scalar(0, 0, 255), 1);
 
     // Y 轴 - 绿
-    line(displayResized, projectedPoints[0], projectedPoints[2], Scalar(0, 255, 0), 2);
+    line(displayResized, projectedPoints[0], projectedPoints[2],
+         Scalar(0, 255, 0), 2);
     putText(displayResized, "Y", projectedPoints[2], FONT_HERSHEY_SIMPLEX, 0.4,
             Scalar(0, 255, 0), 1);
 
     // Z 轴 - 蓝
-    line(displayResized, projectedPoints[0], projectedPoints[3], Scalar(255, 0, 0), 2);
+    line(displayResized, projectedPoints[0], projectedPoints[3],
+         Scalar(255, 0, 0), 2);
     putText(displayResized, "Z", projectedPoints[3], FONT_HERSHEY_SIMPLEX, 0.4,
             Scalar(255, 0, 0), 1);
   }
@@ -590,10 +595,14 @@ int main(int argc, char* argv[]) {
   // 从输入图像路径生成输出文件名
   // 提取图像文件名（不含路径和扩展名）
   size_t lastSlash = imageFile.find_last_of("/\\");
-  string imageDir = (lastSlash != string::npos) ? imageFile.substr(0, lastSlash) : ".";
-  string imageFilename = (lastSlash != string::npos) ? imageFile.substr(lastSlash + 1) : imageFile;
+  string imageDir =
+      (lastSlash != string::npos) ? imageFile.substr(0, lastSlash) : ".";
+  string imageFilename =
+      (lastSlash != string::npos) ? imageFile.substr(lastSlash + 1) : imageFile;
   size_t lastDot = imageFilename.find_last_of(".");
-  string imageBasename = (lastDot != string::npos) ? imageFilename.substr(0, lastDot) : imageFilename;
+  string imageBasename = (lastDot != string::npos)
+                             ? imageFilename.substr(0, lastDot)
+                             : imageFilename;
 
   // 生成输出文件名：result_[图像名].yaml，保存在图像所在目录
   string outputFile = imageDir + "/result_" + imageBasename + ".yaml";
