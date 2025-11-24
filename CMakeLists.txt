@@ -81,8 +81,18 @@ ament_target_dependencies(record_video
   OpenCV
 )
 
+# 可执行文件7: apriltag_batch_process (AprilTag 批量处理工具)
+add_executable(apriltag_batch_process src/apriltag_batch_process.cpp)
+
+# 为 apriltag_batch_process 链接 OpenCV 和系统 apriltag 库
+target_link_libraries(apriltag_batch_process
+  ${OpenCV_LIBS}
+  apriltag
+  m
+)
+
 # 安装可执行文件
-install(TARGETS camera_node calibrate_camera undistort_camera extrinsic_calib apriltag_detector record_video
+install(TARGETS camera_node calibrate_camera undistort_camera extrinsic_calib apriltag_detector record_video apriltag_batch_process
   RUNTIME DESTINATION lib/${PROJECT_NAME}  # 可执行文件安装到 lib/${PROJECT_NAME} 目录
 )
 

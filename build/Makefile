@@ -57,10 +57,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib
+CMAKE_SOURCE_DIR = /home/zzh/hikon_cam/src/cam_intrinsic_calib
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build
+CMAKE_BINARY_DIR = /home/zzh/hikon_cam/src/cam_intrinsic_calib/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -142,9 +142,9 @@ install/strip/fast: preinstall/fast
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/CMakeFiles /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build//CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles /home/zzh/hikon_cam/src/cam_intrinsic_calib/build//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -274,6 +274,43 @@ record_video: cmake_check_build_system
 record_video/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/record_video.dir/build.make CMakeFiles/record_video.dir/build
 .PHONY : record_video/fast
+
+#=============================================================================
+# Target rules for targets named apriltag_batch_process
+
+# Build rule for target.
+apriltag_batch_process: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 apriltag_batch_process
+.PHONY : apriltag_batch_process
+
+# fast build rule for target.
+apriltag_batch_process/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/build
+.PHONY : apriltag_batch_process/fast
+
+src/apriltag_batch_process.o: src/apriltag_batch_process.cpp.o
+.PHONY : src/apriltag_batch_process.o
+
+# target to build an object file
+src/apriltag_batch_process.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/src/apriltag_batch_process.cpp.o
+.PHONY : src/apriltag_batch_process.cpp.o
+
+src/apriltag_batch_process.i: src/apriltag_batch_process.cpp.i
+.PHONY : src/apriltag_batch_process.i
+
+# target to preprocess a source file
+src/apriltag_batch_process.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/src/apriltag_batch_process.cpp.i
+.PHONY : src/apriltag_batch_process.cpp.i
+
+src/apriltag_batch_process.s: src/apriltag_batch_process.cpp.s
+.PHONY : src/apriltag_batch_process.s
+
+# target to generate assembly for a file
+src/apriltag_batch_process.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/src/apriltag_batch_process.cpp.s
+.PHONY : src/apriltag_batch_process.cpp.s
 
 src/apriltag_detector.o: src/apriltag_detector.cpp.o
 .PHONY : src/apriltag_detector.o
@@ -434,12 +471,16 @@ help:
 	@echo "... test"
 	@echo "... cam_intrinsic_calib_uninstall"
 	@echo "... uninstall"
+	@echo "... apriltag_batch_process"
 	@echo "... apriltag_detector"
 	@echo "... calibrate_camera"
 	@echo "... camera_node"
 	@echo "... extrinsic_calib"
 	@echo "... record_video"
 	@echo "... undistort_camera"
+	@echo "... src/apriltag_batch_process.o"
+	@echo "... src/apriltag_batch_process.i"
+	@echo "... src/apriltag_batch_process.s"
 	@echo "... src/apriltag_detector.o"
 	@echo "... src/apriltag_detector.i"
 	@echo "... src/apriltag_detector.s"

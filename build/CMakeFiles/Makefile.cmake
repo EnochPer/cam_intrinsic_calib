@@ -726,4 +726,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/extrinsic_calib.dir/DependInfo.cmake"
   "CMakeFiles/apriltag_detector.dir/DependInfo.cmake"
   "CMakeFiles/record_video.dir/DependInfo.cmake"
+  "CMakeFiles/apriltag_batch_process.dir/DependInfo.cmake"
   )

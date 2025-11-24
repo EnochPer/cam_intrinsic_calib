@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/zzh/hikon_cam/src/cam_intrinsic_calib/src/record_video.cpp" "CMakeFiles/record_video.dir/src/record_video.cpp.o" "gcc" "CMakeFiles/record_video.dir/src/record_video.cpp.o.d"
+  "/home/zzh/hikon_cam/src/cam_intrinsic_calib/src/apriltag_batch_process.cpp" "CMakeFiles/apriltag_batch_process.dir/src/apriltag_batch_process.cpp.o" "gcc" "CMakeFiles/apriltag_batch_process.dir/src/apriltag_batch_process.cpp.o.d"
   )
 
 # Targets to which this target links.

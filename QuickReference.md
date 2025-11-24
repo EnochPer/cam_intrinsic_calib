@@ -219,7 +219,6 @@ PixelType_Gvsp_YCBCR444_8      // YCbCr 444 8 位
 PixelType_Gvsp_YUV420SP        // YUV 420 SP（NV12，1.5 字节/像素）
 ```
 
-### 其他格式
 ```c
 PixelType_Gvsp_JPEG            // JPEG 压缩
 PixelType_Gvsp_Coord3D_ABC32f  // 3D 坐标 ABC 32 位浮点

@@ -1,4 +1,4 @@
-# Install script for directory: /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib
+# Install script for directory: /home/zzh/hikon_cam/src/cam_intrinsic_calib
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -49,7 +49,7 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/camera_node"
          RPATH "")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/camera_node")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/camera_node")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/camera_node" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/camera_node")
     file(RPATH_CHANGE
@@ -69,7 +69,7 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/calibrate_camera"
          RPATH "")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/calibrate_camera")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/calibrate_camera")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/calibrate_camera" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/calibrate_camera")
     file(RPATH_CHANGE
@@ -89,7 +89,7 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/undistort_camera"
          RPATH "")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/undistort_camera")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/undistort_camera")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/undistort_camera" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/undistort_camera")
     file(RPATH_CHANGE
@@ -109,7 +109,7 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/extrinsic_calib"
          RPATH "")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/extrinsic_calib")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/extrinsic_calib")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/extrinsic_calib" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/extrinsic_calib")
     file(RPATH_CHANGE
@@ -129,7 +129,7 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/apriltag_detector"
          RPATH "")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/apriltag_detector")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/apriltag_detector")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/apriltag_detector" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/apriltag_detector")
     file(RPATH_CHANGE
@@ -149,7 +149,7 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/record_video"
          RPATH "")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/record_video")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/record_video")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/record_video" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/record_video")
     file(RPATH_CHANGE
@@ -163,11 +163,31 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/ament_index/resource_index/package_run_dependencies" TYPE FILE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/cam_intrinsic_calib")
+  if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/apriltag_batch_process" AND
+     NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/apriltag_batch_process")
+    file(RPATH_CHECK
+         FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/apriltag_batch_process"
+         RPATH "")
+  endif()
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib" TYPE EXECUTABLE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/apriltag_batch_process")
+  if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/apriltag_batch_process" AND
+     NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/apriltag_batch_process")
+    file(RPATH_CHANGE
+         FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/apriltag_batch_process"
+         OLD_RPATH "/opt/MVS/lib:/usr/local/lib:"
+         NEW_RPATH "")
+    if(CMAKE_INSTALL_DO_STRIP)
+      execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cam_intrinsic_calib/apriltag_batch_process")
+    endif()
+  endif()
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/ament_index/resource_index/parent_prefix_path" TYPE FILE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/ament_cmake_index/share/ament_index/resource_index/parent_prefix_path/cam_intrinsic_calib")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/ament_index/resource_index/package_run_dependencies" TYPE FILE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/cam_intrinsic_calib")
+endif()
+
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/ament_index/resource_index/parent_prefix_path" TYPE FILE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/ament_cmake_index/share/ament_index/resource_index/parent_prefix_path/cam_intrinsic_calib")
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
@@ -175,7 +195,7 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib/environment" TYPE FILE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/ament_prefix_path.dsv")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib/environment" TYPE FILE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/ament_prefix_path.dsv")
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
@@ -183,42 +203,42 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib/environment" TYPE FILE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/path.dsv")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib/environment" TYPE FILE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/path.dsv")
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib" TYPE FILE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/local_setup.bash")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib" TYPE FILE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/local_setup.bash")
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib" TYPE FILE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/local_setup.sh")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib" TYPE FILE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/local_setup.sh")
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib" TYPE FILE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/local_setup.zsh")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib" TYPE FILE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/local_setup.zsh")
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib" TYPE FILE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/local_setup.dsv")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib" TYPE FILE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/local_setup.dsv")
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib" TYPE FILE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/package.dsv")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib" TYPE FILE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/ament_cmake_environment_hooks/package.dsv")
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/ament_index/resource_index/packages" TYPE FILE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/ament_cmake_index/share/ament_index/resource_index/packages/cam_intrinsic_calib")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/ament_index/resource_index/packages" TYPE FILE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/ament_cmake_index/share/ament_index/resource_index/packages/cam_intrinsic_calib")
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib/cmake" TYPE FILE FILES
-    "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/ament_cmake_core/cam_intrinsic_calibConfig.cmake"
-    "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/ament_cmake_core/cam_intrinsic_calibConfig-version.cmake"
+    "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/ament_cmake_core/cam_intrinsic_calibConfig.cmake"
+    "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/ament_cmake_core/cam_intrinsic_calibConfig-version.cmake"
     )
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib" TYPE FILE FILES "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/package.xml")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cam_intrinsic_calib" TYPE FILE FILES "/home/zzh/hikon_cam/src/cam_intrinsic_calib/package.xml")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT)
@@ -229,5 +249,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

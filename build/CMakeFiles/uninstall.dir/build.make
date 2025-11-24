@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib
+CMAKE_SOURCE_DIR = /home/zzh/hikon_cam/src/cam_intrinsic_calib
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build
+CMAKE_BINARY_DIR = /home/zzh/hikon_cam/src/cam_intrinsic_calib/build
 
 # Utility rule file for uninstall.
 
@@ -78,6 +78,6 @@ CMakeFiles/uninstall.dir/clean:
 .PHONY : CMakeFiles/uninstall.dir/clean
 
 CMakeFiles/uninstall.dir/depend:
-	cd /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/build/CMakeFiles/uninstall.dir/DependInfo.cmake --color=$(COLOR)
+	cd /home/zzh/hikon_cam/src/cam_intrinsic_calib/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/zzh/hikon_cam/src/cam_intrinsic_calib /home/zzh/hikon_cam/src/cam_intrinsic_calib /home/zzh/hikon_cam/src/cam_intrinsic_calib/build /home/zzh/hikon_cam/src/cam_intrinsic_calib/build /home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles/uninstall.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : CMakeFiles/uninstall.dir/depend
 

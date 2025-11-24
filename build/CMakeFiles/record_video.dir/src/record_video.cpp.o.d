@@ -1,5 +1,5 @@
 CMakeFiles/record_video.dir/src/record_video.cpp.o: \
- /home/zzh/cam_intrinsic_calib/src/cam_intrinsic_calib/src/record_video.cpp \
+ /home/zzh/hikon_cam/src/cam_intrinsic_calib/src/record_video.cpp \
  /usr/include/stdc-predef.h \
  /opt/ros/humble/include/cv_bridge/cv_bridge/cv_bridge.h \
  /opt/ros/humble/include/sensor_msgs/sensor_msgs/msg/image.hpp \
