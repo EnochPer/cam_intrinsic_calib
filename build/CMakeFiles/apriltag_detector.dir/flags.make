@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = 
 
-CXX_INCLUDES = -I/opt/MVS/include -isystem /usr/include/opencv4 -isystem /usr/local/include/apriltag
+CXX_INCLUDES = -I/opt/MVS/include -I/home/zzh/hikon_cam/src/cam_intrinsic_calib/include -isystem /usr/include/opencv4 -isystem /usr/local/include/apriltag
 
 CXX_FLAGS = 
 

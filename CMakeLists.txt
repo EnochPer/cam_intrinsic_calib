@@ -81,14 +81,24 @@ ament_target_dependencies(record_video
   OpenCV
 )
 
-# 可执行文件7: apriltag_batch_process (AprilTag 批量处理工具)
-add_executable(apriltag_batch_process src/apriltag_batch_process.cpp)
+# 查找 ceres-solver 库
+find_package(Ceres REQUIRED)
 
-# 为 apriltag_batch_process 链接 OpenCV 和系统 apriltag 库
+# 可执行文件7: apriltag_batch_process (AprilTag 批量处理工具)
+add_executable(apriltag_batch_process src/apriltag_batch_process.cpp src/BA_tag_window.cpp)
+
+# 为 apriltag_batch_process 链接 OpenCV、apriltag 和 ceres-solver 库
 target_link_libraries(apriltag_batch_process
   ${OpenCV_LIBS}
   apriltag
+  Ceres::ceres
   m
+)
+
+# 包含头文件目录
+include_directories(
+  include
+  ${CERES_INCLUDE_DIRS}
 )
 
 # 安装可执行文件

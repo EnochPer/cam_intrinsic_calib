@@ -288,6 +288,30 @@ apriltag_batch_process/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/build
 .PHONY : apriltag_batch_process/fast
 
+src/BA_tag_window.o: src/BA_tag_window.cpp.o
+.PHONY : src/BA_tag_window.o
+
+# target to build an object file
+src/BA_tag_window.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/src/BA_tag_window.cpp.o
+.PHONY : src/BA_tag_window.cpp.o
+
+src/BA_tag_window.i: src/BA_tag_window.cpp.i
+.PHONY : src/BA_tag_window.i
+
+# target to preprocess a source file
+src/BA_tag_window.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/src/BA_tag_window.cpp.i
+.PHONY : src/BA_tag_window.cpp.i
+
+src/BA_tag_window.s: src/BA_tag_window.cpp.s
+.PHONY : src/BA_tag_window.s
+
+# target to generate assembly for a file
+src/BA_tag_window.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/src/BA_tag_window.cpp.s
+.PHONY : src/BA_tag_window.cpp.s
+
 src/apriltag_batch_process.o: src/apriltag_batch_process.cpp.o
 .PHONY : src/apriltag_batch_process.o
 
@@ -478,6 +502,9 @@ help:
 	@echo "... extrinsic_calib"
 	@echo "... record_video"
 	@echo "... undistort_camera"
+	@echo "... src/BA_tag_window.o"
+	@echo "... src/BA_tag_window.i"
+	@echo "... src/BA_tag_window.s"
 	@echo "... src/apriltag_batch_process.o"
 	@echo "... src/apriltag_batch_process.i"
 	@echo "... src/apriltag_batch_process.s"

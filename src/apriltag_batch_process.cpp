@@ -23,154 +23,15 @@
  *
  * @example
    ./apriltag_batch_process images/ camera_calib.yaml extrinsic.yaml 0.1
-   ./apriltag_batch_process /home/zzh/hikon_cam/picture_data/200_300apriltag/ \
+   ./apriltag_batch_process /home/zzh/hikon_cam/picture_data/20251121_174435/ \
  /home/zzh/hikon_cam/camera_calib.yaml /home/zzh/hikon_cam/extrinsic1.yaml \
- 0.1 0.215
+ 0.1 0.215 --ba
    ./apriltag_batch_process images/ camera_calib.yaml extrinsic.yaml 0.1 --draw
  */
 
-#include <cmath>
-#include <cstring>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <map>
-#include <opencv2/calib3d.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/opencv.hpp>
-#include <string>
-#include <vector>
+#include "apriltag_batch_process.h"
 
-// AprilTag 库头文件
-extern "C" {
-#include <apriltag/apriltag.h>
-#include <apriltag/apriltag_pose.h>
-#include <apriltag/tagStandard41h12.h>
-}
-
-namespace fs = std::filesystem;
-using namespace cv;
-using namespace std;
-
-// 数据结构（与 apriltag_detector.cpp 保持一致）
-struct CameraIntrinsics {
-  Mat cameraMatrix;
-  Mat distortionCoeffs;
-  int imageWidth;
-  int imageHeight;
-  bool isValid;
-
-  CameraIntrinsics() : isValid(false), imageWidth(0), imageHeight(0) {
-    cameraMatrix = Mat::eye(3, 3, CV_64F);
-    distortionCoeffs = Mat::zeros(5, 1, CV_64F);
-  }
-};
-
-struct CameraExtrinsics {
-  Mat rotationMatrix;
-  Mat rotationVector;
-  Mat translationVector;
-  bool isValid;
-
-  CameraExtrinsics() : isValid(false) {
-    rotationMatrix = Mat::eye(3, 3, CV_64F);
-    rotationVector = Mat::zeros(3, 1, CV_64F);
-    translationVector = Mat::zeros(3, 1, CV_64F);
-  }
-};
-
-struct AprilTagDetection {
-  int tagId;
-  vector<Point2f> corners;
-  Point2f center;
-  Mat rotationMatrix;        // 方法1: estimate_tag_pose() 结果
-  Mat rotationVector;        // 方法1: estimate_tag_pose() 结果
-  Mat translationVector;     // 方法1: estimate_tag_pose() 结果
-  Mat pnpRotationMatrix;     // 方法2: PnP 结果 - 旋转矩阵
-  Mat pnpRotationVector;     // 方法2: PnP 结果 - 旋转向量
-  Mat pnpTranslationVector;  // 方法2: PnP 结果 - 平移向量
-  Mat baRotationMatrix;      // 方法3: Bundle Adjustment 结果 - 旋转矩阵
-  Mat baRotationVector;      // 方法3: Bundle Adjustment 结果 - 旋转向量
-  Mat baTranslationVector;   // 方法3: Bundle Adjustment 结果 - 平移向量
-  bool isValid;
-
-  AprilTagDetection() : tagId(-1), isValid(false) {
-    rotationMatrix = Mat::eye(3, 3, CV_64F);
-    rotationVector = Mat::zeros(3, 1, CV_64F);
-    translationVector = Mat::zeros(3, 1, CV_64F);
-    pnpRotationMatrix = Mat::eye(3, 3, CV_64F);
-    pnpRotationVector = Mat::zeros(3, 1, CV_64F);
-    pnpTranslationVector = Mat::zeros(3, 1, CV_64F);
-    baRotationMatrix = Mat::eye(3, 3, CV_64F);
-    baRotationVector = Mat::zeros(3, 1, CV_64F);
-    baTranslationVector = Mat::zeros(3, 1, CV_64F);
-  }
-};
-
-// 滑动窗口结构：用于积累多帧检测结果
-struct SlidingWindow {
-  int windowSize;
-  vector<vector<Point2f>> allCorners;  // 滑动窗口内的所有角点 (每帧4个点)
-  vector<Point2f> allCenters;          // 滑动窗口内的所有中心点
-
-  SlidingWindow(int size) : windowSize(size) {}
-
-  // 添加新的检测结果到滑动窗口
-  void addDetection(const vector<Point2f>& corners, const Point2f& center) {
-    allCorners.push_back(corners);
-    allCenters.push_back(center);
-
-    // 保持窗口大小
-    if (allCorners.size() > windowSize) {
-      allCorners.erase(allCorners.begin());
-      allCenters.erase(allCenters.begin());
-    }
-  }
-
-  // 获取滑动窗口内的所有检测结果
-  // tagSize: AprilTag标签的实际尺寸（米）
-  void getWindowData(vector<Point2f>& allImagePoints,
-                     vector<Point3f>& allObjectPoints, double tagSize) {
-    allImagePoints.clear();
-    allObjectPoints.clear();
-
-    for (const auto& corners : allCorners) {
-      // AprilTag的四个角点坐标 (z=0)
-      double halfSize = tagSize / 2.0;
-      vector<Point3f> objectPoints = {
-          Point3f(halfSize, halfSize, 0.0),    // 右上角 (0)
-          Point3f(-halfSize, halfSize, 0.0),   // 左上角 (1)
-          Point3f(-halfSize, -halfSize, 0.0),  // 左下角 (2)
-          Point3f(halfSize, -halfSize, 0.0)    // 右下角 (3)
-      };
-
-      // 扩展图像点和对象点
-      for (size_t i = 0; i < corners.size(); ++i) {
-        allImagePoints.push_back(corners[i]);
-        allObjectPoints.push_back(objectPoints[i]);
-      }
-    }
-  }
-
-  // 检查窗口是否满
-  bool isFull() const { return allCorners.size() == windowSize; }
-};
-
-struct AprilTagWorldPose {
-  int tagId;
-  Mat rotationMatrix;
-  Mat rotationVector;
-  Mat translationVector;
-  bool isValid;
-
-  AprilTagWorldPose() : tagId(-1), isValid(false) {
-    rotationMatrix = Mat::eye(3, 3, CV_64F);
-    rotationVector = Mat::zeros(3, 1, CV_64F);
-    translationVector = Mat::zeros(3, 1, CV_64F);
-  }
-};
+#include "BA_tag_window.cpp"  // 包含 Bundle Adjustment 实现
 
 // 辅助函数（与 apriltag_detector.cpp 保持一致或修改）
 
@@ -197,6 +58,8 @@ void printUsage(const char* programName) {
   cout << "  --method1              使用位姿估计方法1: estimate_tag_pose()\n";
   cout << "  --method2 或 --pnp     使用位姿估计方法2: PnP\n";
   cout << "  --method3 或 --ba      使用位姿估计方法3: Bundle Adjustment\n";
+  cout << "  --method4 或 --ray     使用位姿估计方法4: Ray-Plane Intersection "
+          "(强制约束Z高度)\n";
   cout << "  --help                 显示此帮助信息\n\n";
   cout << "════════════════════════════════════════════════════════════\n\n";
 }
@@ -264,10 +127,10 @@ CameraExtrinsics readExtrinsicsFromYAML(const string& filename) {
 /**
  * @brief 检测图像中的 AprilTag
  */
-vector<AprilTagDetection> detectAprilTags(const Mat& image, double tagSize,
-                                          const Mat& cameraMatrix,
-                                          const Mat& distCoeffs) {
-  vector<AprilTagDetection> detections;
+AprilTagDetection detectAprilTags(const Mat& image, double tagSize,
+                                  const Mat& cameraMatrix,
+                                  const Mat& distCoeffs) {
+  AprilTagDetection detection;
 
   // 创建检测器
   apriltag_family_t* tf = tagStandard41h12_create();
@@ -290,7 +153,6 @@ vector<AprilTagDetection> detectAprilTags(const Mat& image, double tagSize,
 
   // 检测标记
   zarray_t* detections_array = apriltag_detector_detect(td, img_u8);
-  int num_detections = zarray_size(detections_array);
 
   // 用于位姿估计的相机内参
   apriltag_detection_info_t info;
@@ -301,113 +163,53 @@ vector<AprilTagDetection> detectAprilTags(const Mat& image, double tagSize,
   info.cx = cameraMatrix.at<double>(0, 2);
   info.cy = cameraMatrix.at<double>(1, 2);
 
-  // 处理每个检测到的标记
-  for (int i = 0; i < num_detections; ++i) {
-    apriltag_detection_t* det = nullptr;
-    zarray_get(detections_array, i, &det);
+  apriltag_detection_t* det = nullptr;
+  zarray_get(detections_array, 0, &det);
+  // AprilTagDetection detection;
+  detection.tagId = det->id;
 
-    if (det == nullptr) continue;
-
-    AprilTagDetection detection;
-    detection.tagId = det->id;
-
-    // 提取四个角点和中心
-    for (int j = 0; j < 4; ++j) {
-      detection.corners.push_back(Point2f(det->p[j][0], det->p[j][1]));
-    }
-    detection.center = Point2f(det->c[0], det->c[1]);
-
-    // 亚像素角点精化（提高像素级精度）
-    TermCriteria subpixelCriteria(TermCriteria::EPS | TermCriteria::MAX_ITER,
-                                  30, 0.01);
-    cornerSubPix(gray, detection.corners, Size(11, 11), Size(-1, -1),
-                 subpixelCriteria);
-
-    // 方法1: 保持原有的estimate_tag_pose()
-    info.det = det;
-    apriltag_pose_t pose;
-    estimate_tag_pose(&info, &pose);
-
-    // 转换位姿到 OpenCV 格式
-    detection.rotationMatrix = Mat(3, 3, CV_64F);
-    for (int r = 0; r < 3; ++r) {
-      for (int c = 0; c < 3; ++c) {
-        detection.rotationMatrix.at<double>(r, c) = MATD_EL(pose.R, r, c);
-      }
-    }
-
-    detection.translationVector = Mat(3, 1, CV_64F);
-    for (int r = 0; r < 3; ++r) {
-      detection.translationVector.at<double>(r, 0) = MATD_EL(pose.t, r, 0);
-    }
-
-    // 转换为旋转向量
-    Rodrigues(detection.rotationMatrix, detection.rotationVector);
-
-    // 方法2: 使用PnP算法计算位姿（作为可选方法）
-    // 定义AprilTag的3D模型点
-    vector<Point3f> objectPoints;
-    double halfSize = tagSize / 2.0;
-
-    // AprilTag的四个角点坐标 (z=0)
-    objectPoints.emplace_back(halfSize, halfSize, 0.0);    // 右上角 (0)
-    objectPoints.emplace_back(-halfSize, halfSize, 0.0);   // 左上角 (1)
-    objectPoints.emplace_back(-halfSize, -halfSize, 0.0);  // 左下角 (2)
-    objectPoints.emplace_back(halfSize, -halfSize, 0.0);   // 右下角 (3)
-
-    // 转换图像点为合适的格式
-    vector<Point2f> imagePoints = detection.corners;
-
-    // 使用PnP算法
-    Mat rvec, tvec;
-    bool success = solvePnP(objectPoints, imagePoints, cameraMatrix, distCoeffs,
-                            rvec, tvec, false, SOLVEPNP_ITERATIVE);
-
-    if (success) {
-      // 可选：使用RANSAC进行鲁棒性PnP
-      Mat rvecRansac, tvecRansac;
-      vector<int> inliers;
-
-      bool ransacSuccess = solvePnPRansac(
-          objectPoints, imagePoints, cameraMatrix, distCoeffs, rvecRansac,
-          tvecRansac, false, 200, 8.0, 0.99, inliers, SOLVEPNP_IPPE_SQUARE);
-
-      // 如果RANSAC成功，使用更鲁棒的结果并进行LM精化
-      if (ransacSuccess) {
-        rvec = rvecRansac.clone();
-        tvec = tvecRansac.clone();
-
-        // 提取inliers点集
-        vector<Point3f> inlierObjectPoints;
-        vector<Point2f> inlierImagePoints;
-        for (int idx : inliers) {
-          inlierObjectPoints.push_back(objectPoints[idx]);
-          inlierImagePoints.push_back(imagePoints[idx]);
-        }
-
-        // 使用LM算法精化位姿
-        solvePnPRefineLM(inlierObjectPoints, inlierImagePoints, cameraMatrix,
-                         distCoeffs, rvec, tvec);
-      }
-
-      // 将PnP结果保存到检测结构体中
-      detection.pnpRotationVector = rvec.clone();
-      detection.pnpTranslationVector = tvec.clone();
-      Rodrigues(rvec, detection.pnpRotationMatrix);
-
-      // 可选：输出调试信息
-      // cout << "  [DEBUG] PnP位姿估计结果：" << endl;
-      // cout << "    旋转向量：" << rvec.t() << endl;
-      // cout << "    平移向量：" << tvec.t() << endl;
-    }
-
-    detection.isValid = true;
-    detections.push_back(detection);
-
-    // 清理位姿结构体
-    matd_destroy(pose.R);
-    matd_destroy(pose.t);
+  // 提取四个角点和中心
+  for (int j = 0; j < 4; ++j) {
+    detection.corners.push_back(Point2f(det->p[j][0], det->p[j][1]));
   }
+  detection.center = Point2f(det->c[0], det->c[1]);
+
+  // 亚像素角点精化（提高像素级精度）
+  TermCriteria subpixelCriteria(TermCriteria::EPS | TermCriteria::MAX_ITER, 30,
+                                0.01);
+  cornerSubPix(gray, detection.corners, Size(11, 11), Size(-1, -1),
+               subpixelCriteria);
+
+  // 方法1: 保持原有的estimate_tag_pose()
+  info.det = det;
+  apriltag_pose_t pose;
+  estimate_tag_pose(&info, &pose);
+
+  // 转换位姿到 OpenCV 格式
+  detection.rotationMatrix = Mat(3, 3, CV_64F);
+  for (int r = 0; r < 3; ++r) {
+    for (int c = 0; c < 3; ++c) {
+      detection.rotationMatrix.at<double>(r, c) = MATD_EL(pose.R, r, c);
+    }
+  }
+
+  detection.translationVector = Mat(3, 1, CV_64F);
+  for (int r = 0; r < 3; ++r) {
+    detection.translationVector.at<double>(r, 0) =
+        MATD_EL(pose.t, r, 0) * 1000;  // 转换为 mm
+  }
+
+  Rodrigues(detection.rotationMatrix, detection.rotationVector);
+
+  cout << "  [DEBUG] 单应矩阵estimate_tag_pose位姿估计结果,相机坐标系：" << endl;
+  // cout << "    旋转向量：" << detection.rotationVector << endl;
+  cout << "    平移向量：" << detection.translationVector << endl;
+
+  detection.isValid = true;
+
+  // 清理位姿结构体
+  matd_destroy(pose.R);
+  matd_destroy(pose.t);
 
   // 清理资源
   image_u8_destroy(img_u8);
@@ -415,7 +217,7 @@ vector<AprilTagDetection> detectAprilTags(const Mat& image, double tagSize,
   apriltag_detector_destroy(td);
   tagStandard41h12_destroy(tf);
 
-  return detections;
+  return detection;
 }
 
 /**
@@ -425,146 +227,391 @@ vector<AprilTagDetection> detectAprilTags(const Mat& image, double tagSize,
  */
 AprilTagWorldPose transformToWorldCoordinates(
     const AprilTagDetection& cameraDetection,
-    const CameraExtrinsics& cameraExtrinsics, bool usePnP = false,
-    bool useBA = false) {  // 默认使用原始的estimate_tag_pose结果
+    const CameraExtrinsics& cameraExtrinsics,
+    bool useBA) {  // 默认使用原始的estimate_tag_pose结果
   AprilTagWorldPose worldPose;
   worldPose.tagId = cameraDetection.tagId;
 
+  // 获取世界到相机的变换（外参）,世界坐标系原点在相机坐标系中的位姿
+  Mat R_c2w = cameraExtrinsics.rotationMatrix;
+  Mat t_c2w = cameraExtrinsics.translationVector;
   // 获取相机到世界的变换
-  Mat R_w2c = cameraExtrinsics.rotationMatrix;     // 世界→相机 旋转
-  Mat t_w2c = cameraExtrinsics.translationVector;  // 世界→相机 平移 (mm)
-
-  Mat R_c2w = R_w2c.t();       // 相机→世界 旋转
-  Mat t_c2w = -R_c2w * t_w2c;  // 相机→世界 平移 (mm)
-
-  Mat R_cam2tag;  // 相机→标签 旋转
-  Mat t_cam2tag;  // 相机→标签 平移
-
+  Mat R_w2c = R_c2w.t();
+  Mat t_w2c = -R_c2w * t_c2w;
+  // 获取相机到标签的变换，即标签在相机坐标系中的位姿
+  Mat R_c2t;
+  Mat t_c2t;
   if (useBA) {
     // 使用Bundle Adjustment位姿估计结果
-    R_cam2tag = cameraDetection.baRotationMatrix;
-    t_cam2tag =
-        cameraDetection.baTranslationVector.clone() * 1000;  // 转换为 mm
+    R_c2t = cameraDetection.baRotationMatrix;
+    t_c2t = cameraDetection.baTranslationVector.clone();
     cout << "  [DEBUG] 使用Bundle Adjustment结果进行位姿变换" << endl;
-  } else if (usePnP) {
-    // 使用PnP位姿估计结果
-    R_cam2tag = cameraDetection.pnpRotationMatrix;
-    t_cam2tag =
-        cameraDetection.pnpTranslationVector.clone() * 1000;  // 转换为 mm
   } else {
     // 使用原始的estimate_tag_pose结果
-    R_cam2tag = cameraDetection.rotationMatrix;
-    t_cam2tag = cameraDetection.translationVector.clone() * 1000;  // 转换为 mm
+    R_c2t = cameraDetection.rotationMatrix;
+    t_c2t = cameraDetection.translationVector.clone();
+    cout << "  [DEBUG] 使用单应矩阵H法进行位姿变换" << endl;
   }
+  Mat R_w2t = R_w2c * R_c2t;
+  Mat t_w2t = R_w2c * t_c2t + t_w2c;
 
   // 标签在世界坐标系中的旋转和平移
-  worldPose.rotationMatrix = R_c2w * R_cam2tag;
-  worldPose.translationVector = R_c2w * t_cam2tag + t_c2w;
+  worldPose.rotationMatrix = R_w2t;
+  worldPose.translationVector = t_w2t;
 
   // 转换为旋转向量
   Rodrigues(worldPose.rotationMatrix, worldPose.rotationVector);
+
+  cout << "  [DEBUG] 标签在世界坐标系中的位姿：" << endl;
+  // cout << "    旋转向量：" << worldPose.rotationVector << endl;
+  cout << "    平移向量：" << worldPose.translationVector << endl;
 
   worldPose.isValid = true;
 
   return worldPose;
 }
 
+// 滑动窗口结构体方法实现
+void SlidingWindow::addDetection(const vector<Point2f>& corners,
+                                 const Point2f& center) {
+  allCorners.push_back(corners);
+  allCenters.push_back(center);
+
+  // 保持窗口大小
+  if (allCorners.size() > windowSize) {
+    allCorners.erase(allCorners.begin());
+    allCenters.erase(allCenters.begin());
+  }
+}
+
+void SlidingWindow::getWindowData(vector<Point2f>& allImagePoints) {
+  allImagePoints.clear();
+
+  for (const auto& corners : allCorners) {
+    // 扩展图像点和对象点
+    for (size_t i = 0; i < corners.size(); ++i) {
+      allImagePoints.push_back(corners[i]);
+    }
+  }
+}
+
 /**
  * @brief 使用滑动窗口的PnP位姿估计
  */
-AprilTagDetection detectAprilTagsWithSlidingWindow(const Mat& image,
-                                                   double tagSize,
-                                                   const Mat& cameraMatrix,
-                                                   const Mat& distCoeffs,
-                                                   SlidingWindow& window) {
+AprilTagDetection detectAprilTagsWithSlidingWindow(
+    const Mat& image, double tagSize, const Mat& cameraMatrix,
+    const Mat& distCoeffs, SlidingWindow& window, double zConstraint,
+    int poseMethod) {
   // 首先检测当前帧的AprilTag
-  vector<AprilTagDetection> currentDetections =
+  AprilTagDetection currentDetection =
       detectAprilTags(image, tagSize, cameraMatrix, distCoeffs);
-  if (currentDetections.empty()) {
-    return AprilTagDetection();  // 返回无效检测
-  }
-
-  // 假设只检测到一个标签
-  AprilTagDetection currentDetection = currentDetections[0];
 
   // 将当前检测结果添加到滑动窗口
   window.addDetection(currentDetection.corners, currentDetection.center);
 
   // 如果窗口不满，返回当前检测结果（使用单帧PnP或原始方法）
-  if (!window.isFull()) {
+  if (!window.isFull() || poseMethod == 1) {
     return currentDetection;
   }
 
   // 窗口已满，使用窗口内的所有帧进行PnP位姿估计
   vector<Point2f> allImagePoints;
-  vector<Point3f> allObjectPoints;
-
-  window.getWindowData(allImagePoints, allObjectPoints, tagSize);
+  window.getWindowData(allImagePoints);
 
   // 使用所有帧的点进行PnP位姿估计
   Mat rvec, tvec;
-  bool success = solvePnP(allObjectPoints, allImagePoints, cameraMatrix,
-                          distCoeffs, rvec, tvec, false, SOLVEPNP_ITERATIVE);
+  rvec = currentDetection.rotationVector.clone();
+  tvec = currentDetection.translationVector.clone();
+  // 方法2: 使用Bundle Adjustment (BA) 优化位姿
+  // 使用滑动窗口内的所有帧进行BA优化
+  Mat rvecBA = rvec.clone();
+  Mat tvecBA = tvec.clone();
 
-  if (success) {
-    // 可选：使用RANSAC进行鲁棒性PnP
-    Mat rvecRansac, tvecRansac;
-    vector<int> inliers;
+  // 准备数据用于自定义BA实现
+  std::vector<FrameObservation> observations;
+  std::vector<std::array<double, 6>> poses_initial;
 
-    bool ransacSuccess = solvePnPRansac(
-        allObjectPoints, allImagePoints, cameraMatrix, distCoeffs, rvecRansac,
-        tvecRansac, false, 100, 4.0, 0.99, inliers, SOLVEPNP_ITERATIVE);
+  // 将滑动窗口内的检测结果转换为BA输入格式
+  for (const auto& corners : window.allCorners) {
+    FrameObservation obs;
+    obs.corners_px.reserve(4);
 
-    // 如果RANSAC成功，使用更鲁棒的结果
-    if (ransacSuccess) {
-      rvec = rvecRansac.clone();
-      tvec = tvecRansac.clone();
+    for (const auto& corner : corners) {
+      obs.corners_px.emplace_back(static_cast<double>(corner.x),
+                                  static_cast<double>(corner.y));
     }
 
-    // 更新当前检测结果的PnP位姿
-    currentDetection.pnpRotationVector = rvec.clone();
-    currentDetection.pnpTranslationVector = tvec.clone();
-    Rodrigues(rvec, currentDetection.pnpRotationMatrix);
+    observations.push_back(obs);
 
-    // 方法3: 使用Bundle Adjustment (BA) 优化位姿
-    // 使用滑动窗口内的所有帧进行BA优化
-    Mat rvecBA = rvec.clone();
-    Mat tvecBA = tvec.clone();
+    // 使用当前PnP结果作为所有帧的初始值
+    std::array<double, 6> pose_init;
+    pose_init[0] = rvec.at<double>(0, 0);
+    pose_init[1] = rvec.at<double>(1, 0);
+    pose_init[2] = rvec.at<double>(2, 0);
+    pose_init[3] = tvec.at<double>(0, 0);
+    pose_init[4] = tvec.at<double>(1, 0);
+    pose_init[5] = tvec.at<double>(2, 0);
 
-    // Bundle Adjustment 需要的参数
-    vector<Mat> rvecsBA(1, rvecBA);
-    vector<Mat> tvecsBA(1, tvecBA);
+    poses_initial.push_back(pose_init);
+  }
 
-    // 准备BA的输入参数
-    vector<Point2f> allImagePointsBA = allImagePoints;
-    vector<Point3f> allObjectPointsBA = allObjectPoints;
+  // 执行自定义Bundle Adjustment优化
+  double height_weight = 1000.0;  // 高度约束权重
 
-    // 使用solvePnPRefineLM进行Bundle Adjustment优化
-    // 这是OpenCV提供的LM算法实现的BA
-    solvePnPRefineLM(allObjectPointsBA, allImagePointsBA, cameraMatrix,
-                     distCoeffs, rvecBA, tvecBA);
+  std::vector<std::array<double, 6>> poses_optimized;
+
+  if (bundleAdjustmentTagWindow(observations, poses_initial, cameraMatrix,
+                                distCoeffs, tagSize, zConstraint, height_weight,
+                                poses_optimized)) {
+    // 取最后一帧的优化结果
+    const auto& optimized_pose = poses_optimized.back();
 
     // 更新当前检测结果的BA位姿
+    rvecBA.at<double>(0, 0) = optimized_pose[0];
+    rvecBA.at<double>(1, 0) = optimized_pose[1];
+    rvecBA.at<double>(2, 0) = optimized_pose[2];
+
+    tvecBA.at<double>(0, 0) = optimized_pose[3];
+    tvecBA.at<double>(1, 0) = optimized_pose[4];
+    tvecBA.at<double>(2, 0) = optimized_pose[5];
+
     currentDetection.baRotationVector = rvecBA.clone();
     currentDetection.baTranslationVector = tvecBA.clone();
     Rodrigues(rvecBA, currentDetection.baRotationMatrix);
+    // }
 
-    cout << "  [DEBUG] 使用滑动窗口PnP成功，共使用 " << window.allCorners.size()
+    cout << "  [DEBUG] 使用滑动窗口使用 " << window.allCorners.size()
          << " 帧的数据" << endl;
-    cout << "  [DEBUG] Bundle Adjustment (BA) 位姿优化完成" << endl;
   }
 
   return currentDetection;
 }
 
 /**
- * @brief 应用 Z 高度约束优化位姿
+ * @brief 方法4: 使用射线-平面求交法计算 AprilTag 在世界坐标系中的位置
+ * @details 实现步骤：
+ * 1. 获取 AprilTag 中心点坐标
+ * 2. 利用内参去除图像畸变
+ * 3.
+ * 计算中心点在相机坐标系下的射线向量：利用内参矩阵的逆将像素点转化为归一化相机坐标系下的方向向量
+ * 4. 转换到世界坐标系下：利用外参将相机光心 O 和射线方向 d 计算出来
+ * 5. 将射线和平面求交点：构造方程 P_target = O + x*d; P_target 的 z
+ * 方向分量为固定值，求解 x 并得到 P_target 的 x,y 分量
+ * @param cameraDetection 相机坐标系下的 AprilTag 检测结果
+ * @param cameraIntrinsics 相机内参
+ * @param cameraExtrinsics 相机外参
+ * @param zConstraint 世界坐标系中固定的 Z 高度（米）
+ * @return 世界坐标系下的 AprilTag 位姿
  */
-void applyZConstraint(AprilTagWorldPose& worldPose, double zConstraintMM) {
-  // 将 Z 坐标固定为给定值 (mm)
-  worldPose.translationVector.at<double>(2, 0) = zConstraintMM;
-  // 这里可以添加更复杂的优化，比如重新计算姿态保持 Z 不变
-  // 目前简单实现为直接固定 Z 值
+AprilTagWorldPose rayPlaneIntersectionMethod(
+    const AprilTagDetection& cameraDetection,
+    const CameraIntrinsics& cameraIntrinsics,
+    const CameraExtrinsics& cameraExtrinsics, double zConstraint) {
+  AprilTagWorldPose worldPose;
+  worldPose.tagId = cameraDetection.tagId;
+
+  // 1. 获取 AprilTag 中心点坐标 (像素坐标)
+  Point2f pixelCenter = cameraDetection.center;
+
+  // 2. 利用内参去除图像畸变
+  vector<Point2f> distortedPoints = {pixelCenter};
+  vector<Point2f> undistortedPoints;
+
+  // 使用相机内参和畸变系数进行去畸变
+  undistortPoints(distortedPoints, undistortedPoints,
+                  cameraIntrinsics.cameraMatrix,
+                  cameraIntrinsics.distortionCoeffs);
+
+  if (undistortedPoints.empty()) {
+    cerr << "  [ERROR] 去畸变失败\n";
+    return worldPose;
+  }
+
+  Point2f undistortedCenter = undistortedPoints[0];
+
+  // 3. 计算中心点在相机坐标系下的射线向量
+  // 归一化相机坐标系下的方向向量 (u', v', 1)
+  Mat normalizedDir(3, 1, CV_64F);
+  normalizedDir.at<double>(0, 0) = undistortedCenter.x;
+  normalizedDir.at<double>(1, 0) = undistortedCenter.y;
+  normalizedDir.at<double>(2, 0) = 1.0;
+
+  // 相机坐标系下的射线方向 (未归一化)
+  Mat cameraDir = cameraIntrinsics.cameraMatrix.inv() * normalizedDir;
+
+  // 归一化相机射线方向
+  double norm = sqrt(cameraDir.at<double>(0, 0) * cameraDir.at<double>(0, 0) +
+                     cameraDir.at<double>(1, 0) * cameraDir.at<double>(1, 0) +
+                     cameraDir.at<double>(2, 0) * cameraDir.at<double>(2, 0));
+
+  if (norm < 1e-8) {
+    cerr << "  [ERROR] 射线方向计算失败\n";
+    return worldPose;
+  }
+
+  cameraDir = cameraDir / norm;
+
+  // 4. 转换到世界坐标系下
+  // 获取世界到相机的变换（外参）,世界坐标系原点在相机坐标系中的位姿
+  Mat R_c2w = cameraExtrinsics.rotationMatrix;
+  Mat t_c2w = cameraExtrinsics.translationVector;
+
+  Mat R_w2c = R_c2w.t();       // 相机→世界 旋转矩阵
+  Mat t_w2c = -R_c2w * t_c2w;  // 相机→世界 平移向量 (mm)
+
+  // 相机光心在世界坐标系中的位置 O
+  Mat O_world = t_c2w.clone();
+
+  // 射线方向转换到世界坐标系 d_world
+  Mat d_world = R_c2w * cameraDir;
+
+  // 5. 将射线和平面求交点
+  // 平面方程：P.z = zConstraint (mm)
+  double zConstraintMM = zConstraint * 1000;  // 转换为 mm
+
+  // 射线方程：P = O + x*d_world
+  // 求解 x: O.z + x*d_world.z = zConstraint
+  double denominator = d_world.at<double>(2, 0);
+
+  if (abs(denominator) < 1e-8) {
+    cerr << "  [ERROR] 射线与平面平行，无交点\n";
+    return worldPose;
+  }
+
+  double x = (zConstraintMM - O_world.at<double>(2, 0)) / denominator;
+
+  // 计算目标点 P_target 的 x,y 分量
+  Mat P_target(3, 1, CV_64F);
+  P_target.at<double>(0, 0) =
+      O_world.at<double>(0, 0) + x * d_world.at<double>(0, 0);
+  P_target.at<double>(1, 0) =
+      O_world.at<double>(1, 0) + x * d_world.at<double>(1, 0);
+  P_target.at<double>(2, 0) = zConstraintMM;
+
+  // 使用原始旋转矩阵（从方法1或其他方法获取），仅更新平移向量
+  worldPose.rotationMatrix = R_c2w * cameraDetection.rotationMatrix;
+  worldPose.translationVector = P_target.clone();
+
+  // 转换为旋转向量
+  Rodrigues(worldPose.rotationMatrix, worldPose.rotationVector);
+
+  worldPose.isValid = true;
+
+  cout << "  [DEBUG] 使用位姿估计方法4: Ray-Plane Intersection\n";
+
+  return worldPose;
+}
+
+/**
+ * @brief 执行Bundle Adjustment优化
+ */
+bool bundleAdjustmentTagWindow(
+    const std::vector<FrameObservation>& observations,
+    const std::vector<std::array<double, 6>>& poses_initial,
+    const cv::Mat& cameraMatrix, const cv::Mat& distCoeffs, double tag_size_m,
+    double desired_tag_z, double height_weight,
+    std::vector<std::array<double, 6>>& poses_optimized) {
+  if (observations.empty() || poses_initial.empty()) {
+    cerr << "No observations or initial poses provided\n";
+    return false;
+  }
+
+  const int N = static_cast<int>(observations.size());
+  if (N != poses_initial.size()) {
+    cerr << "Number of observations and initial poses mismatch\n";
+    return false;
+  }
+
+  // Camera intrinsics
+  double fx = cameraMatrix.at<double>(0, 0);
+  double fy = cameraMatrix.at<double>(1, 1);
+  double cx = cameraMatrix.at<double>(0, 2);
+  double cy = cameraMatrix.at<double>(1, 2);
+
+  // Distortion coefficients
+  std::array<double, 5> dist = {0, 0, 0, 0, 0};
+  if (distCoeffs.rows >= 5) {
+    for (int i = 0; i < 5; ++i) {
+      dist[i] = distCoeffs.at<double>(i, 0);
+    }
+  }
+
+  // Build the problem
+  ceres::Problem problem;
+
+  // Parameter blocks: for each frame we have angle-axis (3) and translation (3)
+  poses_optimized = poses_initial;
+
+  std::vector<std::array<double, 3>> angle_axis_params(N);
+  std::vector<std::array<double, 3>> trans_params(N);
+
+  for (int i = 0; i < N; ++i) {
+    // initialize with provided initial values
+    angle_axis_params[i][0] = poses_optimized[i][0];
+    angle_axis_params[i][1] = poses_optimized[i][1];
+    angle_axis_params[i][2] = poses_optimized[i][2];
+
+    trans_params[i][0] = poses_optimized[i][3];
+    trans_params[i][1] = poses_optimized[i][4];
+    trans_params[i][2] = poses_optimized[i][5];
+
+    // Add parameter blocks to problem
+    problem.AddParameterBlock(angle_axis_params[i].data(), 3);
+    problem.AddParameterBlock(trans_params[i].data(), 3);
+  }
+
+  // Prepare object points for a tag (same for all frames)
+  std::vector<cv::Point3d> tag_corners = MakeTagCorners3D(tag_size_m);
+
+  // Add reprojection residuals for each observed corner in each frame
+  for (int i = 0; i < N; ++i) {
+    const auto& obs = observations[i];
+    if (obs.corners_px.size() != tag_corners.size()) {
+      cerr << "Frame " << i << " has unexpected corners count\n";
+      return false;
+    }
+
+    for (size_t k = 0; k < tag_corners.size(); ++k) {
+      const cv::Point2d observed = obs.corners_px[k];
+      const cv::Point3d pt3 = tag_corners[k];
+
+      ceres::CostFunction* cost =
+          ReprojectionError::Create(observed, pt3, fx, fy, cx, cy, dist);
+      // robust loss
+      ceres::LossFunction* loss = new ceres::HuberLoss(1.0);
+
+      problem.AddResidualBlock(cost, loss, angle_axis_params[i].data(),
+                               trans_params[i].data());
+    }
+
+    // Add height constraint residual on translation z
+    ceres::CostFunction* height_cost =
+        HeightConstraint::Create(desired_tag_z, height_weight);
+    problem.AddResidualBlock(height_cost, nullptr, trans_params[i].data());
+  }
+
+  // Solver options
+  ceres::Solver::Options options;
+  options.max_num_iterations = 200;
+  options.linear_solver_type = ceres::DENSE_SCHUR;  // small problem -> ok
+  options.minimizer_progress_to_stdout = false;     // 关闭输出以保持简洁
+  options.num_threads = 4;
+
+  ceres::Solver::Summary summary;
+  ceres::Solve(options, &problem, &summary);
+
+  // Update the optimized poses
+  for (int i = 0; i < N; ++i) {
+    poses_optimized[i][0] = angle_axis_params[i][0];
+    poses_optimized[i][1] = angle_axis_params[i][1];
+    poses_optimized[i][2] = angle_axis_params[i][2];
+
+    poses_optimized[i][3] = trans_params[i][0];
+    poses_optimized[i][4] = trans_params[i][1];
+    poses_optimized[i][5] = trans_params[i][2];
+  }
+
+  return true;
 }
 
 // 辅助函数：将旋转矩阵转换为四元数
@@ -785,18 +832,6 @@ void visualizeTrajectory(
   double minY = 0.0;  // Y轴范围 0 到 3.0 米
   double maxY = 3.1;
 
-  // // Z轴范围仍根据数据自动计算
-  // double minZ = INFINITY, maxZ = -INFINITY;
-  // for (const auto& [tagId, points] : tagTrajectories) {
-  //   for (const auto& point : points) {
-  //     minZ = min(minZ, point.z);
-  //     maxZ = max(maxZ, point.z);
-  //   }
-  // }
-
-  // if (minZ == INFINITY) minZ = 0.0;
-  // if (maxZ == -INFINITY) maxZ = 1.0;
-
   // 计算范围
   double rangeX = maxX - minX;
   double rangeY = maxY - minY;
@@ -933,11 +968,11 @@ int main(int argc, char* argv[]) {
     } else if (strcmp(argv[i], "--method1") == 0) {
       poseMethod = 1;  // 使用原始的estimate_tag_pose()
     } else if (strcmp(argv[i], "--method2") == 0 ||
-               strcmp(argv[i], "--pnp") == 0) {
-      poseMethod = 2;  // 使用PnP结果
-    } else if (strcmp(argv[i], "--method3") == 0 ||
                strcmp(argv[i], "--ba") == 0) {
-      poseMethod = 3;  // 使用Bundle Adjustment结果
+      poseMethod = 2;  // 使用BA结果
+    } else if (strcmp(argv[i], "--method3") == 0 ||
+               strcmp(argv[i], "--ray") == 0) {
+      poseMethod = 3;  // 使用射线平面相交法结果
     }
   }
 
@@ -973,7 +1008,7 @@ int main(int argc, char* argv[]) {
   vector<pair<string, vector<AprilTagWorldPose>>> allResults;
 
   // 创建滑动窗口，窗口大小为3帧
-  const int windowSize = 5;
+  const int windowSize = 10;
   SlidingWindow slidingWindow(windowSize);
 
   for (const string& imageFile : imageFiles) {
@@ -985,7 +1020,6 @@ int main(int argc, char* argv[]) {
       continue;
     }
 
-    cv::Point2f bias = {60, 450};
     double old_cx = intrinsics.cameraMatrix.at<double>(0, 2);
     double old_cy = intrinsics.cameraMatrix.at<double>(1, 2);
     double x_offset = 60;
@@ -999,7 +1033,7 @@ int main(int argc, char* argv[]) {
     // 检测 AprilTag 使用滑动窗口 (暂时使用原始相机矩阵，未裁切)
     AprilTagDetection detection = detectAprilTagsWithSlidingWindow(
         image, tagSize, cameraMatrix_cropped, intrinsics.distortionCoeffs,
-        slidingWindow);
+        slidingWindow, zConstraint, poseMethod);
 
     // 保存检测到AprilTag的图像
     if (detection.isValid) {
@@ -1039,31 +1073,33 @@ int main(int argc, char* argv[]) {
     switch (poseMethod) {
       case 1:
         worldPose = transformToWorldCoordinates(
-            detection, extrinsics, false,
+            detection, extrinsics,
             false);  // 使用原始的estimate_tag_pose结果
         cout << "  [DEBUG] 使用位姿估计方法1: estimate_tag_pose()\n";
         break;
+
       case 2:
-        worldPose = transformToWorldCoordinates(detection, extrinsics, true,
-                                                false);  // 使用PnP结果
-        cout << "  [DEBUG] 使用位姿估计方法2: PnP\n";
-        break;
-      case 3:
-        worldPose = transformToWorldCoordinates(detection, extrinsics, false,
+        worldPose = transformToWorldCoordinates(detection, extrinsics,
                                                 true);  // 使用BA结果
-        cout << "  [DEBUG] 使用位姿估计方法3: Bundle Adjustment\n";
+        cout << "  [DEBUG] 使用位姿估计方法2: Bundle Adjustment\n";
         break;
+
+      case 3:
+        // 使用射线-平面求交法，该方法本身需要强制Z约束
+        if (zConstraint <= 0.0) {
+          cerr << "  [ERROR] 使用方法3 (Ray-Plane Intersection) "
+                  "必须提供Z高度约束\n";
+          continue;  // 跳过该帧
+        }
+        worldPose = rayPlaneIntersectionMethod(detection, intrinsics,
+                                               extrinsics, zConstraint);
+        break;
+
       default:
-        worldPose = transformToWorldCoordinates(detection, extrinsics, false,
+        worldPose = transformToWorldCoordinates(detection, extrinsics,
                                                 false);  // 默认使用方法1
         cout << "  [DEBUG] 使用默认位姿估计方法1: estimate_tag_pose()\n";
         break;
-    }
-
-    // 应用 Z 高度约束
-    if (zConstraint > 0.0) {
-      double zConstraintMM = zConstraint * 1000;  // 转换为 mm
-      applyZConstraint(worldPose, zConstraintMM);
     }
 
     worldPoses.push_back(worldPose);
