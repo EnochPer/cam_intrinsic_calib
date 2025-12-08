@@ -591,7 +591,7 @@ CMakeFiles/apriltag_batch_process.dir/src/BA_tag_window.cpp.o: \
  /usr/include/opencv4/opencv2/video.hpp \
  /usr/include/opencv4/opencv2/video/tracking.hpp \
  /usr/include/opencv4/opencv2/video/background_segm.hpp \
- /home/zzh/hikon_cam/src/cam_intrinsic_calib/include/apriltag_batch_process.h \
+ /home/zzh/hikon_cam/src/cam_intrinsic_calib/src/../include/calib_base.h \
  /usr/include/c++/11/filesystem /usr/include/c++/11/bits/fs_fwd.h \
  /usr/include/c++/11/bits/fs_path.h /usr/include/c++/11/codecvt \
  /usr/include/c++/11/bits/fs_dir.h /usr/include/c++/11/bits/fs_ops.h \
@@ -599,6 +599,7 @@ CMakeFiles/apriltag_batch_process.dir/src/BA_tag_window.cpp.o: \
  /usr/include/x86_64-linux-gnu/c++/11/bits/basic_file.h \
  /usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h \
  /usr/include/c++/11/bits/fstream.tcc \
+ /home/zzh/hikon_cam/src/cam_intrinsic_calib/include/apriltag_batch_process.h \
  /usr/local/include/apriltag/apriltag.h \
  /usr/local/include/apriltag/common/matd.h \
  /usr/local/include/apriltag/common/image_u8.h \

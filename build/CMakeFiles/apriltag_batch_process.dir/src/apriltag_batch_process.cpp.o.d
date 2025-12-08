@@ -616,4 +616,5 @@ CMakeFiles/apriltag_batch_process.dir/src/apriltag_batch_process.cpp.o: \
  /usr/local/include/apriltag/common/pthreads_cross.h \
  /usr/local/include/apriltag/apriltag_pose.h \
  /usr/local/include/apriltag/tagStandard41h12.h \
+ /home/zzh/hikon_cam/src/cam_intrinsic_calib/include/calib_base.h \
  /home/zzh/hikon_cam/src/cam_intrinsic_calib/src/BA_tag_window.cpp

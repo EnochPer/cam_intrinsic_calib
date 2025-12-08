@@ -147,7 +147,7 @@ CMakeFiles/cam_intrinsic_calib_uninstall.dir/clean:
 CMakeFiles/camera_node.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/camera_node.dir/build.make CMakeFiles/camera_node.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/camera_node.dir/build.make CMakeFiles/camera_node.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=8,9 "Built target camera_node"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=10,11 "Built target camera_node"
 .PHONY : CMakeFiles/camera_node.dir/all
 
 # Build rule for subdir invocation for target.
@@ -173,7 +173,7 @@ CMakeFiles/camera_node.dir/clean:
 CMakeFiles/calibrate_camera.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/calibrate_camera.dir/build.make CMakeFiles/calibrate_camera.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/calibrate_camera.dir/build.make CMakeFiles/calibrate_camera.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=6,7 "Built target calibrate_camera"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=8,9 "Built target calibrate_camera"
 .PHONY : CMakeFiles/calibrate_camera.dir/all
 
 # Build rule for subdir invocation for target.
@@ -199,7 +199,7 @@ CMakeFiles/calibrate_camera.dir/clean:
 CMakeFiles/undistort_camera.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/undistort_camera.dir/build.make CMakeFiles/undistort_camera.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/undistort_camera.dir/build.make CMakeFiles/undistort_camera.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=14,15 "Built target undistort_camera"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=17,18 "Built target undistort_camera"
 .PHONY : CMakeFiles/undistort_camera.dir/all
 
 # Build rule for subdir invocation for target.
@@ -225,12 +225,12 @@ CMakeFiles/undistort_camera.dir/clean:
 CMakeFiles/extrinsic_calib.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/extrinsic_calib.dir/build.make CMakeFiles/extrinsic_calib.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/extrinsic_calib.dir/build.make CMakeFiles/extrinsic_calib.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=10,11 "Built target extrinsic_calib"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=12,13,14 "Built target extrinsic_calib"
 .PHONY : CMakeFiles/extrinsic_calib.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/extrinsic_calib.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles 3
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/extrinsic_calib.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles 0
 .PHONY : CMakeFiles/extrinsic_calib.dir/rule
@@ -251,12 +251,12 @@ CMakeFiles/extrinsic_calib.dir/clean:
 CMakeFiles/apriltag_detector.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_detector.dir/build.make CMakeFiles/apriltag_detector.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_detector.dir/build.make CMakeFiles/apriltag_detector.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=4,5 "Built target apriltag_detector"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=5,6,7 "Built target apriltag_detector"
 .PHONY : CMakeFiles/apriltag_detector.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/apriltag_detector.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles 3
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/apriltag_detector.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles 0
 .PHONY : CMakeFiles/apriltag_detector.dir/rule
@@ -277,7 +277,7 @@ CMakeFiles/apriltag_detector.dir/clean:
 CMakeFiles/record_video.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/record_video.dir/build.make CMakeFiles/record_video.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/record_video.dir/build.make CMakeFiles/record_video.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=12,13 "Built target record_video"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=15,16 "Built target record_video"
 .PHONY : CMakeFiles/record_video.dir/all
 
 # Build rule for subdir invocation for target.
@@ -303,12 +303,12 @@ CMakeFiles/record_video.dir/clean:
 CMakeFiles/apriltag_batch_process.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=1,2,3 "Built target apriltag_batch_process"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles --progress-num=1,2,3,4 "Built target apriltag_batch_process"
 .PHONY : CMakeFiles/apriltag_batch_process.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/apriltag_batch_process.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles 3
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles 4
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/apriltag_batch_process.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/zzh/hikon_cam/src/cam_intrinsic_calib/build/CMakeFiles 0
 .PHONY : CMakeFiles/apriltag_batch_process.dir/rule

@@ -8,6 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/home/zzh/hikon_cam/src/cam_intrinsic_calib/src/calib_base.cpp" "CMakeFiles/extrinsic_calib.dir/src/calib_base.cpp.o" "gcc" "CMakeFiles/extrinsic_calib.dir/src/calib_base.cpp.o.d"
   "/home/zzh/hikon_cam/src/cam_intrinsic_calib/src/extrinsic_calib.cpp" "CMakeFiles/extrinsic_calib.dir/src/extrinsic_calib.cpp.o" "gcc" "CMakeFiles/extrinsic_calib.dir/src/extrinsic_calib.cpp.o.d"
   )
 

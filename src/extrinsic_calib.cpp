@@ -49,6 +49,8 @@
 #include <string>
 #include <vector>
 
+#include "../include/calib_base.h"
+
 using namespace cv;
 using namespace std;
 
@@ -56,20 +58,7 @@ using namespace std;
 // 数据结构
 // ============================================================================
 
-/// 相机内参结构体
-struct CameraIntrinsics {
-  Mat cameraMatrix;      ///< 3×3 相机矩阵
-  Mat distortionCoeffs;  ///< 畸变系数 (k1, k2, p1, p2, k3, ...)
-  int imageWidth;        ///< 图像宽度
-  int imageHeight;       ///< 图像高度
-  bool isValid;          ///< 是否有效
-  string description;    ///< 描述信息
-
-  CameraIntrinsics() : isValid(false), imageWidth(0), imageHeight(0) {
-    cameraMatrix = Mat::eye(3, 3, CV_64F);
-    distortionCoeffs = Mat::zeros(5, 1, CV_64F);
-  }
-};
+/// 相机内参结构体已在 calib_base.h 中定义
 
 /// 外参标定结果结构体
 struct ExtrinsicResult {
@@ -131,50 +120,8 @@ void printUsage(const char* programName) {
   cout << "════════════════════════════════════════════════════════════\n\n";
 }
 
-/**
- * @brief 从 YAML 文件读取相机内参
- * @param filename YAML 文件路径
- * @return 相机内参结构体
- */
-CameraIntrinsics readIntrinsicsFromYAML(const string& filename) {
-  CameraIntrinsics intrinsics;
-
-  FileStorage fs(filename, FileStorage::READ);
-  if (!fs.isOpened()) {
-    cerr << "[ERROR] 无法打开内参文件: " << filename << endl;
-    return intrinsics;
-  }
-
-  try {
-    // 读取相机矩阵
-    fs["camera_matrix"] >> intrinsics.cameraMatrix;
-
-    // 读取畸变系数
-    if (fs["distortion_coefficients"].empty()) {
-      fs["distortion_coeffs"] >> intrinsics.distortionCoeffs;
-    } else {
-      fs["distortion_coefficients"] >> intrinsics.distortionCoeffs;
-    }
-
-    // 读取图像尺寸
-    if (!fs["image_width"].empty()) {
-      intrinsics.imageWidth = (int)fs["image_width"];
-    }
-    if (!fs["image_height"].empty()) {
-      intrinsics.imageHeight = (int)fs["image_height"];
-    }
-
-    intrinsics.isValid = true;
-    intrinsics.description = "[成功] 读取相机内参: " + filename;
-
-  } catch (const exception& e) {
-    cerr << "[ERROR] 读取 YAML 文件异常: " << e.what() << endl;
-    intrinsics.isValid = false;
-  }
-
-  fs.release();
-  return intrinsics;
-}
+// 注：该函数已在 calib_base.h 中声明，并在 calib_base.cpp 中实现
+// CameraIntrinsics readIntrinsicsFromYAML(const string& filename);
 
 /**
  * @brief 从文本文件读取世界坐标系控制点
@@ -894,7 +841,7 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  cout << "[成功] " << intrinsics.description << "\n";
+  cout << "[成功] 相机内参读取完成\n";
   cout << "  相机矩阵:\n";
   cout << intrinsics.cameraMatrix << "\n";
   cout << "  畸变系数:\n";

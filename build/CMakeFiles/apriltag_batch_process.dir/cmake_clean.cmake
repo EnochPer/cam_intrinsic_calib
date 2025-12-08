@@ -3,6 +3,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/apriltag_batch_process.dir/src/BA_tag_window.cpp.o.d"
   "CMakeFiles/apriltag_batch_process.dir/src/apriltag_batch_process.cpp.o"
   "CMakeFiles/apriltag_batch_process.dir/src/apriltag_batch_process.cpp.o.d"
+  "CMakeFiles/apriltag_batch_process.dir/src/calib_base.cpp.o"
+  "CMakeFiles/apriltag_batch_process.dir/src/calib_base.cpp.o.d"
   "apriltag_batch_process"
   "apriltag_batch_process.pdb"
 )

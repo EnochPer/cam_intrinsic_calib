@@ -25,36 +25,11 @@ extern "C" {
 #include <apriltag/tagStandard41h12.h>
 }
 
+#include "calib_base.h"
+
 namespace fs = std::filesystem;
 using namespace cv;
 using namespace std;
-
-// 数据结构（与 apriltag_detector.cpp 保持一致）
-struct CameraIntrinsics {
-  Mat cameraMatrix;
-  Mat distortionCoeffs;
-  int imageWidth;
-  int imageHeight;
-  bool isValid;
-
-  CameraIntrinsics() : isValid(false), imageWidth(0), imageHeight(0) {
-    cameraMatrix = Mat::eye(3, 3, CV_64F);
-    distortionCoeffs = Mat::zeros(5, 1, CV_64F);
-  }
-};
-
-struct CameraExtrinsics {
-  Mat rotationMatrix;
-  Mat rotationVector;
-  Mat translationVector;
-  bool isValid;
-
-  CameraExtrinsics() : isValid(false) {
-    rotationMatrix = Mat::eye(3, 3, CV_64F);
-    rotationVector = Mat::zeros(3, 1, CV_64F);
-    translationVector = Mat::zeros(3, 1, CV_64F);
-  }
-};
 
 struct AprilTagDetection {
   int tagId;
@@ -203,8 +178,9 @@ struct FrameObservation {
 };
 
 // Simple helper to create tag corner 3D points in tag-local coords
-inline std::vector<cv::Point3d> MakeTagCorners3D(double tag_size_m) {
-  double hs = tag_size_m / 2.0;
+// tag_size_mm: tag size in millimeters
+inline std::vector<cv::Point3d> MakeTagCorners3D(double tag_size_mm) {
+  double hs = tag_size_mm / 2.0;  // half size in millimeters
   // Match the order used by your detector. Ensure consistent order.
   // Here we follow: 0: right-top, 1: left-top, 2: left-bottom, 3: right -
   // bottom
@@ -219,6 +195,6 @@ inline std::vector<cv::Point3d> MakeTagCorners3D(double tag_size_m) {
 bool bundleAdjustmentTagWindow(
     const std::vector<FrameObservation>& observations,
     const std::vector<std::array<double, 6>>& poses_initial,
-    const cv::Mat& cameraMatrix, const cv::Mat& distCoeffs, double tag_size_m,
+    const cv::Mat& cameraMatrix, const cv::Mat& distCoeffs, double tag_size_mm,
     double desired_tag_z, double height_weight,
     std::vector<std::array<double, 6>>& poses_optimized);

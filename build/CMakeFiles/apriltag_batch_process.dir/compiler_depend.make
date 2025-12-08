@@ -699,7 +699,8 @@ CMakeFiles/apriltag_batch_process.dir/src/BA_tag_window.cpp.o: ../src/BA_tag_win
   /usr/include/x86_64-linux-gnu/sys/time.h \
   /usr/local/include/apriltag/common/pthreads_cross.h \
   /usr/local/include/apriltag/apriltag_pose.h \
-  /usr/local/include/apriltag/tagStandard41h12.h
+  /usr/local/include/apriltag/tagStandard41h12.h \
+  ../include/calib_base.h
 
 CMakeFiles/apriltag_batch_process.dir/src/apriltag_batch_process.cpp.o: ../src/apriltag_batch_process.cpp \
   /usr/include/stdc-predef.h \
@@ -1400,8 +1401,11 @@ CMakeFiles/apriltag_batch_process.dir/src/apriltag_batch_process.cpp.o: ../src/a
   /usr/local/include/apriltag/common/pthreads_cross.h \
   /usr/local/include/apriltag/apriltag_pose.h \
   /usr/local/include/apriltag/tagStandard41h12.h \
+  ../include/calib_base.h \
   ../src/BA_tag_window.cpp
 
+
+../include/calib_base.h:
 
 /usr/local/include/apriltag/apriltag_pose.h:
 

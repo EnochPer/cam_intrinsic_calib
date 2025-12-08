@@ -40,6 +40,9 @@
 #include <string>
 #include <vector>
 
+// 引入共享的相机参数读取函数
+#include "../include/calib_base.h"
+
 // AprilTag 库头文件（从系统安装的 apriltag 项目中获取）
 extern "C" {
 #include <apriltag/apriltag.h>
@@ -61,34 +64,6 @@ using namespace std;
 // ============================================================================
 // 数据结构
 // ============================================================================
-
-/// 相机内参结构体
-struct CameraIntrinsics {
-  Mat cameraMatrix;      ///< 3×3 相机矩阵
-  Mat distortionCoeffs;  ///< 畸变系数
-  int imageWidth;        ///< 图像宽度
-  int imageHeight;       ///< 图像高度
-  bool isValid;          ///< 是否有效
-
-  CameraIntrinsics() : isValid(false), imageWidth(0), imageHeight(0) {
-    cameraMatrix = Mat::eye(3, 3, CV_64F);
-    distortionCoeffs = Mat::zeros(5, 1, CV_64F);
-  }
-};
-
-/// 相机外参结构体
-struct CameraExtrinsics {
-  Mat rotationMatrix;     ///< 3×3 旋转矩阵 (世界→相机)
-  Mat rotationVector;     ///< 3×1 旋转向量
-  Mat translationVector;  ///< 3×1 平移向量 (单位: mm)
-  bool isValid;           ///< 是否有效
-
-  CameraExtrinsics() : isValid(false) {
-    rotationMatrix = Mat::eye(3, 3, CV_64F);
-    rotationVector = Mat::zeros(3, 1, CV_64F);
-    translationVector = Mat::zeros(3, 1, CV_64F);
-  }
-};
 
 /// AprilTag 检测结果结构体
 struct AprilTagDetection {
@@ -154,73 +129,6 @@ void printUsage(const char* programName) {
   cout << "  --visualize            显示识别结果和坐标系\n";
   cout << "  --help                 显示此帮助信息\n\n";
   cout << "════════════════════════════════════════════════════════════\n\n";
-}
-
-/**
- * @brief 从 YAML 文件读取相机内参
- */
-CameraIntrinsics readIntrinsicsFromYAML(const string& filename) {
-  CameraIntrinsics intrinsics;
-
-  FileStorage fs(filename, FileStorage::READ);
-  if (!fs.isOpened()) {
-    cerr << "[ERROR] 无法打开内参文件: " << filename << endl;
-    return intrinsics;
-  }
-
-  try {
-    fs["camera_matrix"] >> intrinsics.cameraMatrix;
-
-    if (fs["distortion_coefficients"].empty()) {
-      fs["distortion_coeffs"] >> intrinsics.distortionCoeffs;
-    } else {
-      fs["distortion_coefficients"] >> intrinsics.distortionCoeffs;
-    }
-
-    if (!fs["image_width"].empty()) {
-      intrinsics.imageWidth = (int)fs["image_width"];
-    }
-    if (!fs["image_height"].empty()) {
-      intrinsics.imageHeight = (int)fs["image_height"];
-    }
-
-    intrinsics.isValid = true;
-
-  } catch (const exception& e) {
-    cerr << "[ERROR] 读取内参 YAML 文件异常: " << e.what() << endl;
-    intrinsics.isValid = false;
-  }
-
-  fs.release();
-  return intrinsics;
-}
-
-/**
- * @brief 从 YAML 文件读取相机外参
- */
-CameraExtrinsics readExtrinsicsFromYAML(const string& filename) {
-  CameraExtrinsics extrinsics;
-
-  FileStorage fs(filename, FileStorage::READ);
-  if (!fs.isOpened()) {
-    cerr << "[ERROR] 无法打开外参文件: " << filename << endl;
-    return extrinsics;
-  }
-
-  try {
-    fs["rotation_matrix"] >> extrinsics.rotationMatrix;
-    fs["rotation_vector"] >> extrinsics.rotationVector;
-    fs["translation_vector"] >> extrinsics.translationVector;
-
-    extrinsics.isValid = true;
-
-  } catch (const exception& e) {
-    cerr << "[ERROR] 读取外参 YAML 文件异常: " << e.what() << endl;
-    extrinsics.isValid = false;
-  }
-
-  fs.release();
-  return extrinsics;
 }
 
 /**

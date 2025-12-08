@@ -45,7 +45,7 @@ target_link_libraries(undistort_camera
 )
 
 # 可执行文件4: extrinsic_calib (外参标定工具)
-add_executable(extrinsic_calib src/extrinsic_calib.cpp)
+add_executable(extrinsic_calib src/extrinsic_calib.cpp src/calib_base.cpp)
 
 # 为 extrinsic_calib 链接 OpenCV
 target_link_libraries(extrinsic_calib
@@ -56,7 +56,7 @@ target_link_libraries(extrinsic_calib
 # 链接系统安装的 apriltag 库
 find_package(apriltag REQUIRED)
 
-add_executable(apriltag_detector src/apriltag_detector.cpp)
+add_executable(apriltag_detector src/apriltag_detector.cpp src/calib_base.cpp)
 
 # 为 apriltag_detector 链接 OpenCV 和系统 apriltag 库
 target_link_libraries(apriltag_detector
@@ -85,7 +85,7 @@ ament_target_dependencies(record_video
 find_package(Ceres REQUIRED)
 
 # 可执行文件7: apriltag_batch_process (AprilTag 批量处理工具)
-add_executable(apriltag_batch_process src/apriltag_batch_process.cpp src/BA_tag_window.cpp)
+add_executable(apriltag_batch_process src/apriltag_batch_process.cpp src/BA_tag_window.cpp src/calib_base.cpp)
 
 # 为 apriltag_batch_process 链接 OpenCV、apriltag 和 ceres-solver 库
 target_link_libraries(apriltag_batch_process

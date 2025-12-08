@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "../include/calib_base.h"
 #include "apriltag_batch_process.h"
 // --------------------------- Cost functor ---------------------------
 struct ReprojectionError {

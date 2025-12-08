@@ -360,6 +360,36 @@ src/apriltag_detector.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_detector.dir/build.make CMakeFiles/apriltag_detector.dir/src/apriltag_detector.cpp.s
 .PHONY : src/apriltag_detector.cpp.s
 
+src/calib_base.o: src/calib_base.cpp.o
+.PHONY : src/calib_base.o
+
+# target to build an object file
+src/calib_base.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/extrinsic_calib.dir/build.make CMakeFiles/extrinsic_calib.dir/src/calib_base.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_detector.dir/build.make CMakeFiles/apriltag_detector.dir/src/calib_base.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/src/calib_base.cpp.o
+.PHONY : src/calib_base.cpp.o
+
+src/calib_base.i: src/calib_base.cpp.i
+.PHONY : src/calib_base.i
+
+# target to preprocess a source file
+src/calib_base.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/extrinsic_calib.dir/build.make CMakeFiles/extrinsic_calib.dir/src/calib_base.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_detector.dir/build.make CMakeFiles/apriltag_detector.dir/src/calib_base.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/src/calib_base.cpp.i
+.PHONY : src/calib_base.cpp.i
+
+src/calib_base.s: src/calib_base.cpp.s
+.PHONY : src/calib_base.s
+
+# target to generate assembly for a file
+src/calib_base.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/extrinsic_calib.dir/build.make CMakeFiles/extrinsic_calib.dir/src/calib_base.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_detector.dir/build.make CMakeFiles/apriltag_detector.dir/src/calib_base.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/apriltag_batch_process.dir/build.make CMakeFiles/apriltag_batch_process.dir/src/calib_base.cpp.s
+.PHONY : src/calib_base.cpp.s
+
 src/calibrate_camera.o: src/calibrate_camera.cpp.o
 .PHONY : src/calibrate_camera.o
 
@@ -511,6 +541,9 @@ help:
 	@echo "... src/apriltag_detector.o"
 	@echo "... src/apriltag_detector.i"
 	@echo "... src/apriltag_detector.s"
+	@echo "... src/calib_base.o"
+	@echo "... src/calib_base.i"
+	@echo "... src/calib_base.s"
 	@echo "... src/calibrate_camera.o"
 	@echo "... src/calibrate_camera.i"
 	@echo "... src/calibrate_camera.s"

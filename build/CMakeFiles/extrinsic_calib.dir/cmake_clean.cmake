@@ -1,4 +1,6 @@
 file(REMOVE_RECURSE
+  "CMakeFiles/extrinsic_calib.dir/src/calib_base.cpp.o"
+  "CMakeFiles/extrinsic_calib.dir/src/calib_base.cpp.o.d"
   "CMakeFiles/extrinsic_calib.dir/src/extrinsic_calib.cpp.o"
   "CMakeFiles/extrinsic_calib.dir/src/extrinsic_calib.cpp.o.d"
   "extrinsic_calib"

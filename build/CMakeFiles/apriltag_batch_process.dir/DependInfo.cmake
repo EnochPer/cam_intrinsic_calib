@@ -10,6 +10,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/home/zzh/hikon_cam/src/cam_intrinsic_calib/src/BA_tag_window.cpp" "CMakeFiles/apriltag_batch_process.dir/src/BA_tag_window.cpp.o" "gcc" "CMakeFiles/apriltag_batch_process.dir/src/BA_tag_window.cpp.o.d"
   "/home/zzh/hikon_cam/src/cam_intrinsic_calib/src/apriltag_batch_process.cpp" "CMakeFiles/apriltag_batch_process.dir/src/apriltag_batch_process.cpp.o" "gcc" "CMakeFiles/apriltag_batch_process.dir/src/apriltag_batch_process.cpp.o.d"
+  "/home/zzh/hikon_cam/src/cam_intrinsic_calib/src/calib_base.cpp" "CMakeFiles/apriltag_batch_process.dir/src/calib_base.cpp.o" "gcc" "CMakeFiles/apriltag_batch_process.dir/src/calib_base.cpp.o.d"
   )
 
 # Targets to which this target links.
