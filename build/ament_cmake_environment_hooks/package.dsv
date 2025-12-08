@@ -1,4 +1,0 @@
-source;share/cam_intrinsic_calib/local_setup.bash
-source;share/cam_intrinsic_calib/local_setup.dsv
-source;share/cam_intrinsic_calib/local_setup.sh
-source;share/cam_intrinsic_calib/local_setup.zsh

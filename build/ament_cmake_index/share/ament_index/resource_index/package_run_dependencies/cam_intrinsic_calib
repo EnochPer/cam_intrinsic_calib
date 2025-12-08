@@ -1,1 +1,0 @@
-rclcpp;sensor_msgs;cv_bridge;rosbag2_cpp;rosbag2_storage;opencv;libMvCameraControl.so
