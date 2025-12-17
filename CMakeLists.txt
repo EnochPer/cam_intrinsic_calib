@@ -62,7 +62,6 @@ add_executable(apriltag_detector src/apriltag_detector.cpp src/calib_base.cpp)
 target_link_libraries(apriltag_detector
   ${OpenCV_LIBS}
   apriltag
-  m
 )
 
 # 可执行文件6: record_video (视频录制工具)
@@ -92,7 +91,6 @@ target_link_libraries(apriltag_batch_process
   ${OpenCV_LIBS}
   apriltag
   Ceres::ceres
-  m
 )
 
 # 包含头文件目录
